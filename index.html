@@ -1,0 +1,3818 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>慢一点，刚好遇见你</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#000;
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  /* ---------- 标题界面 ---------- */
+  #title-screen {
+    position:fixed; inset:0; z-index:50; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    background:linear-gradient(160deg,#ffe9d6 0%,#ffd3c2 40%,#c9a7d8 100%);
+    transition:opacity 1.2s ease;
+  }
+  #title-screen.hidden { opacity:0; pointer-events:none; }
+  #title-screen h1 {
+    font-size:min(9vw,64px); color:#5a3a4a; letter-spacing:.12em;
+    text-shadow:0 4px 24px rgba(255,255,255,.7); margin-bottom:14px; font-weight:700;
+  }
+  #title-screen .sub { color:#8a5a6a; font-size:min(4vw,20px); letter-spacing:.3em; margin-bottom:8px; }
+  #title-screen .credits { color:#a07888; font-size:14px; margin-bottom:40px; }
+  #start-btn {
+    font-size:20px; padding:14px 58px; border:none; border-radius:40px; cursor:pointer;
+    background:linear-gradient(135deg,#ff8fa3,#ff6f91); color:#fff; letter-spacing:.35em;
+    box-shadow:0 8px 28px rgba(255,111,145,.45); transition:transform .2s, box-shadow .2s;
+  }
+  #start-btn:hover { transform:translateY(-3px) scale(1.04); box-shadow:0 12px 34px rgba(255,111,145,.6); }
+  #title-screen .hint { margin-top:30px; color:#9a7086; font-size:13.5px; line-height:2; }
+  #title-screen .hint b { color:#7a4a60; }
+  .heart-float { position:absolute; font-size:22px; opacity:.5; animation:floatUp linear infinite; }
+  @keyframes floatUp {
+    from { transform:translateY(105vh) rotate(0deg); }
+    to   { transform:translateY(-10vh) rotate(40deg); }
+  }
+
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; z-index:10; pointer-events:none; opacity:0; transition:opacity .8s; }
+  #hud.show { opacity:1; }
+  #chapter-banner {
+    position:absolute; top:0; left:0; right:0; display:flex; flex-direction:column;
+    align-items:center; padding-top:10vh; opacity:0; transition:opacity 1s;
+  }
+  #chapter-banner.show { opacity:1; }
+  #chapter-banner .ch-num { color:#ffdfae; font-size:16px; letter-spacing:.6em; margin-bottom:10px; text-shadow:0 2px 12px rgba(0,0,0,.6); }
+  #chapter-banner .ch-name { color:#fff; font-size:min(7vw,40px); letter-spacing:.2em; text-shadow:0 4px 20px rgba(0,0,0,.6); }
+
+  #affection {
+    position:absolute; top:18px; right:22px; background:rgba(30,15,25,.55);
+    border:1px solid rgba(255,150,180,.4); border-radius:24px; padding:8px 18px;
+    color:#ffd7e2; font-size:15px; letter-spacing:.1em; backdrop-filter:blur(6px);
+    transition:transform .2s;
+  }
+  #affection.pulse { transform:scale(1.15); }
+  #affection .hearts { color:#ff7f9c; letter-spacing:.15em; }
+
+  #objective {
+    position:absolute; top:18px; left:22px; max-width:330px; background:rgba(30,15,25,.55);
+    border:1px solid rgba(255,215,170,.35); border-radius:14px; padding:10px 16px;
+    color:#ffeeda; font-size:14px; line-height:1.7; backdrop-filter:blur(6px);
+  }
+  #objective b { color:#ffd28a; }
+
+  #minigame-hud {
+    position:absolute; top:70px; left:50%; transform:translateX(-50%);
+    background:rgba(20,10,25,.65); border:1.5px solid rgba(140,220,255,.5); border-radius:18px;
+    padding:10px 28px; color:#d8f4ff; font-size:17px; letter-spacing:.08em; display:none;
+    backdrop-filter:blur(6px); text-align:center; line-height:1.7;
+  }
+  #minigame-hud .big { font-size:21px; color:#fff; }
+
+  #interact-tip {
+    position:absolute; left:50%; bottom:26vh; transform:translateX(-50%);
+    background:rgba(20,10,18,.7); border:1px solid rgba(255,255,255,.3); border-radius:30px;
+    padding:9px 24px; color:#fff; font-size:15px; letter-spacing:.08em; display:none;
+    backdrop-filter:blur(4px); text-align:center;
+  }
+  .key {
+    display:inline-block; background:#ffce6b; color:#4a2f10; border-radius:6px;
+    padding:1px 9px; margin:0 5px; font-weight:700; font-size:13.5px;
+  }
+  .key.p2 { background:#8fd0ff; color:#0f2f4a; }
+
+  #controls-hint {
+    position:absolute; bottom:14px; left:22px; color:rgba(255,255,255,.6); font-size:12.5px;
+    letter-spacing:.06em; line-height:1.8; text-shadow:0 1px 6px rgba(0,0,0,.8);
+  }
+  #controls-hint .p1c { color:#ffd28a; }
+  #controls-hint .p2c { color:#9fd8ff; }
+
+  /* ---------- 对话框 ---------- */
+  #dialogue {
+    position:absolute; left:50%; bottom:3.5vh; transform:translateX(-50%);
+    width:min(92vw,860px); pointer-events:auto; display:none;
+  }
+  #dialogue.show { display:block; }
+  #speaker {
+    display:inline-block; margin-left:26px; padding:7px 26px; border-radius:16px 16px 0 0;
+    font-size:17px; letter-spacing:.15em; color:#fff; font-weight:600;
+    background:linear-gradient(135deg,#ff8fa3,#ff6f91);
+  }
+  #speaker.allen  { background:linear-gradient(135deg,#5aa9ff,#3b7fe0); }
+  #speaker.joshua { background:linear-gradient(135deg,#ffd76b,#f2a93b); color:#5a3d00; }
+  #speaker.narrator { background:linear-gradient(135deg,#9b8fc9,#7a6cb0); }
+  #speaker.think { background:linear-gradient(135deg,#f0b8d8,#d898c8); }
+  #text-box {
+    background:rgba(24,14,24,.82); border:1.5px solid rgba(255,200,215,.35);
+    border-radius:18px; padding:22px 30px 26px; min-height:110px;
+    color:#fff4f7; font-size:18px; line-height:1.95; letter-spacing:.04em;
+    backdrop-filter:blur(8px); box-shadow:0 10px 40px rgba(0,0,0,.45);
+    cursor:pointer; position:relative;
+  }
+  #next-arrow {
+    position:absolute; right:22px; bottom:12px; color:#ff9db4; font-size:18px;
+    animation:bounce 1s infinite; display:none;
+  }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(5px)} }
+
+  #choices { margin-top:12px; display:none; flex-direction:column; gap:10px; }
+  #choices.show { display:flex; }
+  .choice-btn {
+    pointer-events:auto; text-align:left; font-size:16.5px; letter-spacing:.05em;
+    padding:13px 24px; border-radius:14px; cursor:pointer; color:#fff;
+    background:rgba(60,30,50,.85); border:1.5px solid rgba(255,160,190,.5);
+    transition:all .18s; backdrop-filter:blur(6px);
+  }
+  .choice-btn:hover { background:rgba(255,111,145,.85); transform:translateX(8px); border-color:#fff; }
+
+  /* ---------- 飘字 & 转场 ---------- */
+  #float-layer { position:fixed; inset:0; z-index:30; pointer-events:none; }
+  .float-txt {
+    position:absolute; font-size:21px; font-weight:700;
+    animation:heartPop 1.7s ease-out forwards; white-space:nowrap;
+  }
+  .float-txt.good { color:#ff6f91; text-shadow:0 2px 10px rgba(255,111,145,.6); }
+  .float-txt.bad  { color:#ff5a5a; text-shadow:0 2px 10px rgba(255,60,60,.6); }
+  .float-txt.info { color:#ffd76b; text-shadow:0 2px 10px rgba(255,200,90,.6); }
+  @keyframes heartPop {
+    0% { opacity:0; transform:translateY(0) scale(.6); }
+    20% { opacity:1; transform:translateY(-16px) scale(1.15); }
+    100% { opacity:0; transform:translateY(-95px) scale(1); }
+  }
+  #fader { position:fixed; inset:0; z-index:40; background:#000; opacity:0; pointer-events:none; transition:opacity 1s ease; }
+  #fader.dark { opacity:1; }
+  #flash { position:fixed; inset:0; z-index:35; background:#fff; opacity:0; pointer-events:none; transition:opacity .25s ease; }
+
+  /* ---------- 结局 ---------- */
+  #ending {
+    position:fixed; inset:0; z-index:45; display:none; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    background:radial-gradient(circle at 50% 35%,#3a2438 0%,#170d18 70%);
+    color:#ffeef4; padding:24px; overflow-y:auto;
+  }
+  #ending.show { display:flex; }
+  #ending h2 { font-size:min(7vw,38px); letter-spacing:.25em; margin-bottom:20px; color:#ffb9cb; }
+  #ending p { font-size:16.5px; line-height:2.1; max-width:640px; color:#f5dbe4; margin-bottom:6px; }
+  #ending .score { margin:22px 0 4px; font-size:19px; color:#ffd28a; letter-spacing:.1em; }
+  #ending .stats { margin:10px 0; font-size:15px; color:#c8b8d8; line-height:2; }
+  #replay-btn {
+    margin-top:24px; font-size:17px; padding:12px 46px; border:none; border-radius:34px; cursor:pointer;
+    background:linear-gradient(135deg,#ff8fa3,#ff6f91); color:#fff; letter-spacing:.3em;
+    box-shadow:0 8px 26px rgba(255,111,145,.4);
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="title-screen">
+  <div class="sub">A LOVE STORY · VANCOUVER · 2P CO-OP</div>
+  <h1>慢一点，刚好遇见你</h1>
+  <div class="credits">Allen（理科·眼镜）♥ 塔米（花艺·白衬衫）　·　旁白：Joshua</div>
+  <button id="start-btn">开始故事</button>
+  <div class="hint">
+    <b>P1 · Allen</b>：WASD 移动 · E 互动　|　<b>P2 · 塔米</b>：方向键 移动 · Enter 互动<br>
+    一个人玩也可以：单人章节两套按键都能用 · 点击对话框推进剧情<br>
+    ⚠ 选项有情商考验——选得不好，塔米是会生气的哦
+  </div>
+</div>
+
+<div id="hud">
+  <div id="chapter-banner"><div class="ch-num"></div><div class="ch-name"></div></div>
+  <div id="objective"></div>
+  <div id="affection">心动值 <span class="hearts"></span></div>
+  <div id="minigame-hud"></div>
+  <div id="interact-tip"></div>
+  <div id="controls-hint"></div>
+  <div id="dialogue">
+    <div id="speaker"></div>
+    <div id="text-box"><span id="text-content"></span><span id="next-arrow">▼</span></div>
+    <div id="choices"></div>
+  </div>
+</div>
+
+<div id="float-layer"></div>
+<div id="fader"></div>
+<div id="flash"></div>
+
+<div id="ending">
+  <h2>终 · 慢一点，刚好遇见你</h2>
+  <p>“她没有改变我的世界。她只是让我发现，原来生活本来就可以这么美。” —— Allen</p>
+  <p>“遇见Allen以后，我才知道，最好的爱情不是轰轰烈烈。<br>而是每天醒来，都觉得今天有他在，真好。” —— 塔米</p>
+  <div class="score"></div>
+  <div class="stats"></div>
+  <p id="ending-comment" style="color:#ffd7a8"></p>
+  <button id="replay-btn">再看一次</button>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   渲染基础
+============================================================ */
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, .1, 400);
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ============================================================
+   简易音效（WebAudio 合成，无素材依赖）
+============================================================ */
+let AC = null;
+function audio() { if (!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); if (AC.state==='suspended') AC.resume(); return AC; }
+function tone(freq, dur=.12, type='sine', vol=.12, slideTo=null, delay=0) {
+  try {
+    const ac = audio();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, ac.currentTime+delay);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ac.currentTime+delay+dur);
+    g.gain.setValueAtTime(0, ac.currentTime+delay);
+    g.gain.linearRampToValueAtTime(vol, ac.currentTime+delay+.015);
+    g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime+delay+dur);
+    o.connect(g).connect(ac.destination);
+    o.start(ac.currentTime+delay); o.stop(ac.currentTime+delay+dur+.05);
+  } catch(e){}
+}
+const SFX = {
+  blip:  () => tone(760,.035,'square',.025),
+  ok:    () => { tone(660,.1,'sine',.1); tone(880,.14,'sine',.1,null,.09); },
+  love:  () => { tone(660,.12,'sine',.12); tone(830,.12,'sine',.12,null,.1); tone(990,.2,'sine',.12,null,.2); },
+  angry: () => { tone(220,.16,'sawtooth',.1,140); tone(160,.2,'sawtooth',.08,110,.12); },
+  splash:() => tone(500,.25,'sine',.12,120),
+  bite:  () => { tone(1100,.07,'square',.1); tone(1100,.07,'square',.1,null,.12); },
+  catch: () => { tone(523,.1,'sine',.12); tone(659,.1,'sine',.12,null,.1); tone(784,.1,'sine',.12,null,.2); tone(1046,.25,'sine',.12,null,.3); },
+  miss:  () => tone(300,.25,'sine',.1,150),
+  spark: () => tone(1400,.12,'sine',.08,2000),
+  pickup:() => tone(880,.09,'triangle',.1,1320),
+  shutter:() => { tone(1800,.03,'square',.08); tone(900,.05,'square',.06,null,.05); },
+  ring:  () => { for (let i=0;i<3;i++){ tone(1320,.09,'square',.07,null,i*.5); tone(1100,.09,'square',.07,null,i*.5+.14); } },
+  whistle:() => tone(1400,.7,'sine',.06,900),
+};
+
+/* ============================================================
+   材质与几何小工具
+============================================================ */
+const M = (c, opt={}) => new THREE.MeshStandardMaterial({ color:c, roughness:.85, metalness:.02, ...opt });
+function box(w,h,d,c,opt){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), M(c,opt)); m.castShadow=m.receiveShadow=true; return m; }
+function cyl(rt,rb,h,c,seg=16,opt){ const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg), M(c,opt)); m.castShadow=m.receiveShadow=true; return m; }
+function sph(r,c,opt){ const m=new THREE.Mesh(new THREE.SphereGeometry(r,20,16), M(c,opt)); m.castShadow=true; return m; }
+function cap(r,h,c,opt){ const m=new THREE.Mesh(new THREE.CapsuleGeometry(r,h,6,14), M(c,opt)); m.castShadow=m.receiveShadow=true; return m; }
+
+/* ============================================================
+   骨骼化卡通角色（可摆臂走路 / 呼吸待机 / 坐姿）
+============================================================ */
+function makeCharacter({ shirt, pants, hair, skin=0xffdcc0, longHair=false, skirt=false, glow=false, glasses=false, shoes=0x4a4440 }) {
+  const g = new THREE.Group();
+  const rig = {};
+
+  // 躯干
+  const torso = new THREE.Group();
+  const body = skirt ? cyl(.24,.4,.72, shirt) : cap(.26,.4,shirt);
+  body.position.y = skirt ? .36 : .38;
+  torso.add(body);
+  torso.position.y = .82; g.add(torso);
+  rig.torso = torso; rig.bodyMesh = body;
+  // 衣领细节
+  const collar = cyl(.16,.19,.1, skirt?0xfff8f0:shirt===0x3b7fe0?0x2b5fa8:shirt); collar.position.y=1.42; g.add(collar);
+
+  // 头（组，可轻微转动）
+  const headG = new THREE.Group();
+  const head = sph(.29, skin); head.scale.y=1.06; headG.add(head);
+  const hairTop = sph(.305, hair); hairTop.position.y=.09; hairTop.scale.set(1,.8,1); headG.add(hairTop);
+  const fringe = box(.54,.18,.1, hair); fringe.position.set(0,.14,.23); headG.add(fringe);
+  if (longHair) {
+    const back = box(.48,.8,.16, hair); back.position.set(0,-.3,-.22); headG.add(back);
+    const l = box(.13,.55,.13,hair); l.position.set(-.29,-.22,-.04); headG.add(l);
+    const r = l.clone(); r.position.x=.29; headG.add(r);
+    // 发饰
+    const clip = sph(.05,0xff8fa3); clip.position.set(.24,.16,.12); headG.add(clip);
+  } else {
+    // 短发侧鬓
+    for (const s of [-1,1]) { const side=box(.1,.2,.16,hair); side.position.set(s*.26,-.02,.05); headG.add(side); }
+  }
+  // 大眼睛（眼白 + 瞳孔 + 高光，可眨眼）+ 眉毛
+  rig.eyes = [];
+  for (const s of [-1,1]) {
+    const eye = new THREE.Group();
+    const white = new THREE.Mesh(new THREE.SphereGeometry(.055,12,12), new THREE.MeshBasicMaterial({ color:0xffffff }));
+    white.scale.set(1,1.25,.55); eye.add(white);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(.034,12,12), new THREE.MeshBasicMaterial({ color:0x35241e }));
+    pupil.scale.set(1,1.35,.6); pupil.position.z=.02; eye.add(pupil);
+    const hl = new THREE.Mesh(new THREE.SphereGeometry(.013,6,6), new THREE.MeshBasicMaterial({ color:0xffffff }));
+    hl.position.set(.015,.028,.045); eye.add(hl);
+    eye.position.set(.105*s, .02, .245);
+    headG.add(eye); rig.eyes.push(eye);
+    const brow = box(.09,.018,.012, hair);
+    brow.position.set(.105*s, .118, .262); brow.rotation.z = s*-.12; headG.add(brow);
+  }
+  // 鼻子 & 微笑的嘴
+  const nose = sph(.022, 0xf5c0a0); nose.position.set(0,-.045,.288); headG.add(nose);
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(.045,.011,6,14,Math.PI),
+    new THREE.MeshBasicMaterial({ color:0xc96a5a }));
+  mouth.position.set(0,-.09,.268); mouth.rotation.z=Math.PI; headG.add(mouth);
+  // 眼镜（理科 Allen）
+  if (glasses) {
+    const gm = new THREE.MeshBasicMaterial({ color:0x2c3e50 });
+    for (const s of [-1,1]) {
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(.085,.013,8,20), gm);
+      rim.position.set(.105*s,.02,.275); headG.add(rim);
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(.08,16),
+        new THREE.MeshBasicMaterial({ color:0xbfe8ff, transparent:true, opacity:.3 }));
+      lens.position.set(.105*s,.02,.272); headG.add(lens);
+      const temple = box(.16,.016,.016, 0x2c3e50); temple.position.set(.2*s,.035,.16); temple.rotation.y=s*.5; headG.add(temple);
+    }
+    const bridge = box(.05,.014,.014,0x2c3e50); bridge.position.set(0,.03,.28); headG.add(bridge);
+  }
+  // 腮红
+  const blushMat = new THREE.MeshBasicMaterial({ color:0xffa9a0, transparent:true, opacity:.65 });
+  for (const s of [-1,1]) {
+    const b = new THREE.Mesh(new THREE.CircleGeometry(.042,10), blushMat);
+    b.position.set(.16*s,-.06,.265); headG.add(b);
+  }
+  const neck = cyl(.08,.09,.14, skin); neck.position.y=1.55; g.add(neck);
+  headG.position.y = 1.72; g.add(headG);
+  rig.head = headG;
+
+  // 四肢（枢轴在肩/髋，向下延伸 → rotation.x 自然摆动）
+  function limb(len, r, color, endColor=null, isLeg=false) {
+    const grp = new THREE.Group();
+    const mesh = cap(r, len-.2, color);
+    mesh.position.y = -len/2;
+    grp.add(mesh);
+    if (endColor !== null) {
+      if (isLeg) {
+        const shoe = box(r*2.2, r*1.4, r*3.4, endColor);
+        shoe.position.set(0, -len+r*.3, r*.75);
+        grp.add(shoe);
+      } else {
+        const h = sph(r*1.05, endColor); h.position.y = -len; grp.add(h);
+      }
+    }
+    return grp;
+  }
+  rig.armL = limb(.56,.075, shirt, skin); rig.armL.position.set(-.33,1.38,0); rig.armL.rotation.z=.12; g.add(rig.armL);
+  rig.armR = limb(.56,.075, shirt, skin); rig.armR.position.set( .33,1.38,0); rig.armR.rotation.z=-.12; g.add(rig.armR);
+  for (const s of [-1,1]) { const sh=sph(.095, shirt); sh.position.set(.33*s,1.4,0); g.add(sh); }   // 圆肩
+  const legColor = pants;
+  rig.legL = limb(.72,.09, legColor, shoes, true); rig.legL.position.set(-.14,.78,0); g.add(rig.legL);
+  rig.legR = limb(.72,.09, legColor, shoes, true); rig.legR.position.set( .14,.78,0); g.add(rig.legR);
+  if (skirt) { const sk = cyl(.28,.44,.34, shirt===0xffffff?0xc9a7d8:pants); sk.position.y=.72; g.add(sk); }
+
+  if (glow) {
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(.24,.03,10,32),
+      new THREE.MeshBasicMaterial({ color:0xffe38a }));
+    halo.rotation.x = Math.PI/2.15; halo.position.y = 2.25; g.add(halo);
+    rig.halo = halo;
+    const light = new THREE.PointLight(0xffe0a0, 3.5, 6); light.position.y=1.6; g.add(light);
+  }
+
+  g.traverse(o=>{ if(o.isMesh) o.castShadow=true; });
+  g.userData.rig = rig;
+  g.userData.phase = Math.random()*6;
+  g.userData.speedNow = 0;
+  g.userData.baseY = 0;
+  g.userData.vel = new THREE.Vector2();
+  return g;
+}
+
+/* ---------- 角色统一动画（走路摆臂 / 待机呼吸 / 坐姿 / 悬浮） ---------- */
+function lerpAngle(cur, target, k){ return cur + (target-cur)*k; }
+function animateChar(c, dt, t) {
+  const r = c.userData.rig; if (!r) return;
+  if (c.userData.acting) return;   // 过场表演接管肢体时跳过程序化动画
+  const sp = c.userData.speedNow || 0;
+  const k = Math.min(1, dt*10);
+
+  // 眨眼
+  c.userData.blinkT = (c.userData.blinkT === undefined ? 2+Math.random()*3 : c.userData.blinkT) - dt;
+  if (c.userData.blinkT < -.12) c.userData.blinkT = 2+Math.random()*3.5;
+  if (r.eyes) { const b = c.userData.blinkT < 0 ? .08 : 1; for (const e of r.eyes) e.scale.y = b; }
+
+  if (c.userData.sitting) {
+    r.legL.rotation.x = lerpAngle(r.legL.rotation.x, -1.45, k);
+    r.legR.rotation.x = lerpAngle(r.legR.rotation.x, -1.45, k);
+    r.armL.rotation.x = lerpAngle(r.armL.rotation.x, -.25, k);
+    r.armR.rotation.x = lerpAngle(r.armR.rotation.x, -.25, k);
+    c.position.y = c.userData.baseY;
+    r.head.rotation.y = Math.sin(t*.7 + c.userData.phase)*.08;
+    return;
+  }
+  if (c.userData.float) {
+    c.position.y = c.userData.baseY + .25 + Math.sin(t*1.2 + c.userData.phase)*.12;
+    r.armL.rotation.x = Math.sin(t*1.1)*.12 - .15;
+    r.armR.rotation.x = -Math.sin(t*1.1)*.12 - .15;
+    if (r.halo) r.halo.rotation.z = t*.8;
+    return;
+  }
+  if (c.userData.riding) {
+    c.userData.phase += dt * (2 + sp*2.4);
+    const a = c.userData.phase;
+    r.legL.rotation.x = -.5 + Math.sin(a)*.5;
+    r.legR.rotation.x = -.5 + Math.sin(a+Math.PI)*.5;
+    r.armL.rotation.x = lerpAngle(r.armL.rotation.x, -.4, k);
+    r.armR.rotation.x = lerpAngle(r.armR.rotation.x, -.4, k);
+    c.position.y = c.userData.baseY;
+    c.rotation.x = lerpAngle(c.rotation.x, sp>.5?.1:0, k);
+    if (c.userData.wheels) for (const w of c.userData.wheels) w.rotation.x += sp*dt*3;
+    return;
+  }
+  if (sp > .4) {
+    c.userData.phase += dt * (5 + sp*1.6);
+    const a = Math.sin(c.userData.phase);
+    r.armL.rotation.x = a*.65;
+    r.armR.rotation.x = -a*.65;
+    r.legL.rotation.x = -a*.85;
+    r.legR.rotation.x = a*.85;
+    c.position.y = c.userData.baseY + Math.abs(Math.sin(c.userData.phase))*.055;
+    c.rotation.x = lerpAngle(c.rotation.x, .06, k);   // 微微前倾
+    r.head.rotation.y = lerpAngle(r.head.rotation.y, 0, k);
+  } else {
+    // 待机：肢体回位 + 呼吸 + 偶尔看看四周
+    r.armL.rotation.x = lerpAngle(r.armL.rotation.x, Math.sin(t*2+c.userData.phase)*.04, k);
+    r.armR.rotation.x = lerpAngle(r.armR.rotation.x, -Math.sin(t*2+c.userData.phase)*.04, k);
+    r.legL.rotation.x = lerpAngle(r.legL.rotation.x, 0, k);
+    r.legR.rotation.x = lerpAngle(r.legR.rotation.x, 0, k);
+    c.rotation.x = lerpAngle(c.rotation.x, 0, k);
+    c.position.y = lerpAngle(c.position.y, c.userData.baseY, k);
+    r.torso.scale.y = 1 + Math.sin(t*2 + c.userData.phase)*.014;
+    r.head.rotation.y = Math.sin(t*.5 + c.userData.phase)*.18;
+    r.head.rotation.x = Math.sin(t*.8 + c.userData.phase)*.04;
+  }
+}
+function setSitting(c, on, baseY=0) {
+  c.userData.sitting = on;
+  c.userData.baseY = baseY;
+  c.position.y = baseY;
+}
+
+/* ---------- 表情气泡（emoji Sprite） ---------- */
+function emote(char, emoji, dur=1.6, y=2.35) {
+  if (!char) return;
+  const sp = emojiSprite(emoji, .7);
+  sp.material.depthTest = false;
+  sp.position.set(0, y, 0);
+  char.add(sp);
+  let e = 0;
+  game.animated.push((t,dt) => {
+    e += dt;
+    sp.position.y = y + e*.35;
+    sp.material.opacity = e < dur*.7 ? 1 : Math.max(0, 1-(e-dur*.7)/(dur*.3));
+    if (e > dur) { char.remove(sp); sp.material.map.dispose(); sp.material.dispose(); return 'done'; }
+  });
+}
+
+/* ---------- 互动光圈 ---------- */
+function makeMarker(color=0xffc46b) {
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.RingGeometry(.5,.68,40),
+    new THREE.MeshBasicMaterial({ color, transparent:true, opacity:.85, side:THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI/2; ring.position.y=.03; g.add(ring);
+  const ring2 = new THREE.Mesh(new THREE.RingGeometry(.2,.3,32),
+    new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:.5, side:THREE.DoubleSide }));
+  ring2.rotation.x = -Math.PI/2; ring2.position.y=.032; g.add(ring2);
+  return g;
+}
+
+/* ============================================================
+   游戏状态
+============================================================ */
+const game = {
+  affection: 0,
+  playing: false,
+  inDialogue: false,
+  mode: 'solo',           // 'solo' | 'dual'（dual = 双人同时操作）
+  soloChar: null,         // solo 模式被控角色
+  allen: null, tammy: null, joshua: null,
+  chars: [],              // 场景内所有角色（统一动画）
+  interactables: [],
+  animated: [],
+  keys: {},
+  worldBounds: { minX:-18, maxX:18, minZ:-18, maxZ:18 },
+  stats: { fish:0, fireflies:0, shells:0, angry:0, photos:0, groceries:0, leaves:0 },
+  camMode: 'follow',
+};
+
+const P1KEYS = { up:'KeyW', down:'KeyS', left:'KeyA', right:'KeyD' };
+const P2KEYS = { up:'ArrowUp', down:'ArrowDown', left:'ArrowLeft', right:'ArrowRight' };
+
+addEventListener('keydown', e => {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+  game.keys[e.code] = true;
+  if (game.inDialogue) {
+    if (e.code==='Space' || e.code==='Enter' || e.code==='KeyE') advanceDialogue();
+    return;
+  }
+  if (e.code==='KeyE') tryInteract('p1');
+  if (e.code==='Enter') tryInteract('p2');
+  if (e.code==='Space') tryInteract('p1');
+});
+addEventListener('keyup', e => game.keys[e.code] = false);
+
+/* ============================================================
+   对话系统
+============================================================ */
+const dlgEl = document.getElementById('dialogue');
+const speakerEl = document.getElementById('speaker');
+const textEl = document.getElementById('text-content');
+const arrowEl = document.getElementById('next-arrow');
+const choicesEl = document.getElementById('choices');
+let dlgQueue = [], dlgIndex = 0, typing = false, typeTimer = null, dlgDone = null;
+
+const SPEAKERS = {
+  allen:    { name:'Allen',        cls:'allen' },
+  tammy:    { name:'塔米',         cls:'' },
+  tThink:   { name:'塔米（内心）', cls:'think' },
+  joshua:   { name:'Joshua · 上帝', cls:'joshua' },
+  narrator: { name:'旁白',         cls:'narrator' },
+};
+
+function say(lines, done) {
+  dlgQueue = lines.slice(); dlgIndex = 0; dlgDone = done || null;
+  game.inDialogue = true;
+  dlgEl.classList.add('show');
+  document.getElementById('interact-tip').style.display='none';
+  showLine();
+}
+function showLine() {
+  const line = dlgQueue[dlgIndex];
+  if (!line) return endDialogue();
+  if (line.fn) line.fn();   // 行内回调（做演出）
+  const sp = SPEAKERS[line.s] || SPEAKERS.narrator;
+  speakerEl.textContent = sp.name;
+  speakerEl.className = sp.cls;
+  choicesEl.classList.remove('show'); choicesEl.innerHTML='';
+  arrowEl.style.display='none';
+  clearInterval(typeTimer);
+  typing = true; textEl.textContent='';
+  let i = 0; const full = line.t;
+  typeTimer = setInterval(() => {
+    textEl.textContent = full.slice(0, ++i);
+    if (i % 3 === 0) SFX.blip();
+    if (i >= full.length) { clearInterval(typeTimer); typing=false; afterType(line); }
+  }, 26);
+}
+function afterType(line) {
+  if (line.choices) {
+    choicesEl.classList.add('show');
+    for (const c of line.choices) {
+      const b = document.createElement('button');
+      b.className='choice-btn'; b.textContent = c.t;
+      b.onclick = ev => {
+        ev.stopPropagation();
+        if (c.love) {
+          addAffection(c.love);
+          if (c.love < 0) {
+            const target = c.angryWho==='allen' ? game.allen : (game.tammy || game.allen);
+            emote(target, '💢');
+            game.stats.angry++;
+          } else if (c.love >= 3) {
+            emote(game.tammy, '❤️');
+          }
+        }
+        if (c.lines) dlgQueue.splice(dlgIndex+1, 0, ...c.lines);
+        dlgIndex++; showLine();
+      };
+      choicesEl.appendChild(b);
+    }
+  } else {
+    arrowEl.style.display='block';
+  }
+}
+function advanceDialogue() {
+  if (!game.inDialogue) return;
+  const line = dlgQueue[dlgIndex];
+  if (typing) {
+    clearInterval(typeTimer); typing=false;
+    textEl.textContent = line.t; afterType(line);
+    return;
+  }
+  if (line && line.choices) return;
+  dlgIndex++; showLine();
+}
+function endDialogue() {
+  dlgEl.classList.remove('show');
+  game.inDialogue = false;
+  const cb = dlgDone; dlgDone = null;
+  if (cb) cb();
+}
+document.getElementById('text-box').addEventListener('click', advanceDialogue);
+
+/* ---------- 心动值（可加可减） ---------- */
+function addAffection(n) {
+  game.affection = Math.max(0, game.affection + n);
+  updateHearts();
+  const aEl = document.getElementById('affection');
+  aEl.classList.add('pulse'); setTimeout(()=>aEl.classList.remove('pulse'), 250);
+  if (n > 0) { floatText('♥ 心动值 +'+n, 'good'); SFX.love(); }
+  else if (n < 0) { floatText('💔 塔米生气了 '+n, 'bad'); SFX.angry(); }
+}
+function floatText(msg, cls='info', x=null, y=null) {
+  const fl = document.getElementById('float-layer');
+  const el = document.createElement('div');
+  el.className = 'float-txt '+cls;
+  el.textContent = msg;
+  el.style.left = (x ?? innerWidth/2 + (Math.random()*140-70)) + 'px';
+  el.style.top  = (y ?? innerHeight*.42) + 'px';
+  fl.appendChild(el);
+  setTimeout(()=>el.remove(), 1800);
+}
+function updateHearts() {
+  const n = Math.min(10, Math.floor(game.affection/8));
+  document.querySelector('#affection .hearts').textContent =
+    '♥'.repeat(Math.max(1,n)) + '♡'.repeat(Math.max(0,10-Math.max(1,n))) + '  ' + game.affection;
+}
+
+/* ---------- HUD ---------- */
+function setObjective(html){ document.getElementById('objective').innerHTML = '<b>· 目标 ·</b><br>'+html; }
+function setControlsHint(mode) {
+  const el = document.getElementById('controls-hint');
+  if (mode==='dual') el.innerHTML = '<span class="p1c">P1 Allen：WASD 移动 · E 互动</span><br><span class="p2c">P2 塔米：方向键 移动 · Enter 互动</span>';
+  else if (mode==='tammy') el.innerHTML = '<span class="p2c">塔米：WASD 或 方向键 移动 · E / Enter 互动</span>';
+  else el.innerHTML = '<span class="p1c">Allen：WASD 或 方向键 移动 · E / Enter 互动</span>';
+}
+function showChapterBanner(num, name) {
+  const b = document.getElementById('chapter-banner');
+  b.querySelector('.ch-num').textContent = num;
+  b.querySelector('.ch-name').textContent = name;
+  b.classList.add('show');
+  setTimeout(()=>b.classList.remove('show'), 3400);
+}
+function setMinigameHUD(html) {
+  const el = document.getElementById('minigame-hud');
+  if (!html) { el.style.display='none'; return; }
+  el.style.display='block'; el.innerHTML = html;
+}
+function fade(dark) {
+  return new Promise(res => {
+    document.getElementById('fader').classList.toggle('dark', dark);
+    setTimeout(res, 1050);
+  });
+}
+function flash() {
+  const f = document.getElementById('flash');
+  f.style.opacity = .9;
+  setTimeout(()=>f.style.opacity = 0, 90);
+}
+function emojiSprite(emoji, scale=.7) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+  const cx = cv.getContext('2d');
+  cx.font = '96px serif'; cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText(emoji, 64, 72);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(cv), transparent:true, depthWrite:false }));
+  sp.scale.set(scale, scale, 1);
+  return sp;
+}
+
+/* ============================================================
+   移动控制（平滑加速 + 转向）
+============================================================ */
+function readInput(km) {
+  const k = game.keys;
+  return {
+    dx: (k[km.right]?1:0) - (k[km.left]?1:0),
+    dz: (k[km.down]?1:0) - (k[km.up]?1:0),
+  };
+}
+function controlChar(c, inp, dt) {
+  const vel = c.userData.vel;
+  const speed = c.userData.riding ? 7.8 : 4.8;
+  let tx = inp.dx, tz = inp.dz;
+  const len = Math.hypot(tx,tz);
+  if (len > 0) { tx = tx/len*speed; tz = tz/len*speed; }
+  // 平滑加减速
+  const accel = len > 0 ? 10 : 14;
+  vel.x += (tx - vel.x) * Math.min(1, dt*accel);
+  vel.y += (tz - vel.y) * Math.min(1, dt*accel);
+  c.position.x += vel.x * dt;
+  c.position.z += vel.y * dt;
+  const b = game.worldBounds;
+  c.position.x = Math.max(b.minX, Math.min(b.maxX, c.position.x));
+  c.position.z = Math.max(b.minZ, Math.min(b.maxZ, c.position.z));
+  const spNow = Math.hypot(vel.x, vel.y);
+  c.userData.speedNow = spNow;
+  if (spNow > .6) {
+    const targetRot = Math.atan2(vel.x, vel.y);
+    let d = targetRot - c.rotation.y;
+    while(d>Math.PI)d-=Math.PI*2; while(d<-Math.PI)d+=Math.PI*2;
+    c.rotation.y += d*Math.min(1, dt*10);
+  }
+}
+function activePlayers() {
+  // 返回 [{char, km, id}]
+  if (game.mode === 'dual') {
+    const arr = [];
+    if (game.allen) arr.push({ char:game.allen, km:P1KEYS, id:'p1' });
+    if (game.tammy) arr.push({ char:game.tammy, km:P2KEYS, id:'p2' });
+    return arr;
+  }
+  if (!game.soloChar) return [];
+  return [{ char:game.soloChar, km:'both', id:'solo' }];
+}
+function updateMovement(dt) {
+  if (game.inDialogue || !game.playing) {
+    for (const p of activePlayers()) { p.char.userData.speedNow = 0; p.char.userData.vel.set(0,0); }
+    return;
+  }
+  for (const p of activePlayers()) {
+    if (p.char.userData.sitting) continue;
+    let inp;
+    if (p.km === 'both') {
+      const a = readInput(P1KEYS), b2 = readInput(P2KEYS);
+      inp = { dx: a.dx||b2.dx, dz: a.dz||b2.dz };
+    } else inp = readInput(p.km);
+    controlChar(p.char, inp, dt);
+  }
+}
+
+/* ---------- 相机（单人跟随 / 双人取中点） ---------- */
+const camTarget = new THREE.Vector3(0,1.4,0);
+function updateCamera(dt) {
+  const ps = activePlayers();
+  if (!ps.length) return;
+  let cx=0, cz=0;
+  for (const p of ps) { cx += p.char.position.x; cz += p.char.position.z; }
+  cx/=ps.length; cz/=ps.length;
+  let dist = 7.5, height = 4.6;
+  if (ps.length === 2) {
+    const sep = ps[0].char.position.distanceTo(ps[1].char.position);
+    dist = Math.min(14, 7.5 + sep*.42);
+    height = Math.min(8, 4.6 + sep*.2);
+  }
+  camTarget.lerp(new THREE.Vector3(cx, 1.4, cz), Math.min(1, dt*4));
+  camera.position.lerp(new THREE.Vector3(cx, height, cz+dist), Math.min(1, dt*3.2));
+  camera.lookAt(camTarget);
+}
+
+/* ---------- 互动系统（区分 P1 / P2 / 任意） ---------- */
+const tipEl = document.getElementById('interact-tip');
+let nearestMap = { p1:null, p2:null, solo:null };
+function updateInteractables() {
+  nearestMap = { p1:null, p2:null, solo:null };
+  if (game.inDialogue || !game.playing) { tipEl.style.display='none'; return; }
+  for (const p of activePlayers()) {
+    let best = 1e9, bestIt = null;
+    for (const it of game.interactables) {
+      if (it.used && it.once) continue;
+      if (it.hidden) continue;
+      if (it.who && it.who!=='any' && p.id!=='solo' && it.who!==p.id) continue;
+      const d = p.char.position.distanceTo(it.pos);
+      if (d < it.radius && d < best) { best = d; bestIt = it; }
+    }
+    nearestMap[p.id] = bestIt;
+  }
+  const tips = [];
+  if (game.mode === 'dual') {
+    if (nearestMap.p1) tips.push('<span class="key">E</span> ' + nearestMap.p1.label);
+    if (nearestMap.p2) tips.push('<span class="key p2">Enter</span> ' + nearestMap.p2.label);
+  } else if (nearestMap.solo) {
+    tips.push('<span class="key">E</span>/<span class="key p2">Enter</span> ' + nearestMap.solo.label);
+  }
+  if (tips.length) { tipEl.innerHTML = tips.join('　·　'); tipEl.style.display='block'; }
+  else tipEl.style.display='none';
+}
+function tryInteract(pid) {
+  if (!game.playing || game.inDialogue) return;
+  const it = game.mode==='dual' ? nearestMap[pid] : nearestMap.solo;
+  if (!it) return;
+  const who = game.mode==='dual' ? pid : 'p1';
+  const result = it.onUse(who);
+  if (result !== false) {
+    if (it.once) it.used = true;
+    if (it.marker && it.once) it.marker.visible = false;
+  }
+}
+function addInteract(x, z, label, onUse, { radius=2.2, once=true, markerColor=0xffc46b, showMarker=true, who='any' }={}) {
+  const it = { pos:new THREE.Vector3(x,0,z), radius, label, onUse, once, used:false, who, hidden:false };
+  if (showMarker) {
+    const mk = makeMarker(markerColor);
+    mk.position.set(x,.02,z);
+    scene.add(mk); it.marker = mk;
+  }
+  game.interactables.push(it);
+  return it;
+}
+function bothNear(pos, radius=2.6) {
+  if (!game.allen || !game.tammy) return true;
+  return game.allen.position.distanceTo(pos) < radius && game.tammy.position.distanceTo(pos) < radius;
+}
+
+/* ============================================================
+   场景搭建
+============================================================ */
+function clearScene() {
+  game.interactables = [];
+  game.animated = [];
+  game.chars = [];
+  game.allen = game.tammy = game.joshua = game.soloChar = null;
+  setMinigameHUD(null);
+  while (scene.children.length) scene.remove(scene.children.pop());
+}
+function ground(c, size=44) {
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(size,size), M(c,{roughness:1}));
+  g.rotation.x=-Math.PI/2; g.receiveShadow=true; scene.add(g); return g;
+}
+function baseLight(skyColor, groundColor, sunColor, sunPos, intensity=1.6) {
+  scene.add(new THREE.HemisphereLight(skyColor, groundColor, .9));
+  const sun = new THREE.DirectionalLight(sunColor, intensity);
+  sun.position.set(...sunPos);
+  sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048);
+  const s=24; Object.assign(sun.shadow.camera,{left:-s,right:s,top:s,bottom:-s,far:90});
+  scene.add(sun);
+  return sun;
+}
+function makeTree(x,z,scale=1,leaf=0x7fae6a){
+  const g=new THREE.Group();
+  const trunk=cyl(.12,.18,1.4,0x8a6242); trunk.position.y=.7; g.add(trunk);
+  const l1=sph(.85,leaf); l1.position.y=1.9; l1.scale.y=.9; g.add(l1);
+  const l2=sph(.6,leaf); l2.position.set(.4,2.4,.1); g.add(l2);
+  g.position.set(x,0,z); g.scale.setScalar(scale); scene.add(g);
+  const sway = Math.random()*6;
+  game.animated.push((t)=>{ l1.position.x = Math.sin(t*.8+sway)*.05; l2.position.x = .4+Math.sin(t*.8+sway+1)*.06; });
+  return g;
+}
+function makeFlowerPot(x,z,color=0xff7f9c){
+  const g=new THREE.Group();
+  const pot=cyl(.18,.13,.26,0xb5651d); pot.position.y=.13; g.add(pot);
+  for(let i=0;i<4;i++){
+    const f=sph(.07,color); const a=i/4*Math.PI*2;
+    f.position.set(Math.cos(a)*.09,.36+Math.random()*.08,Math.sin(a)*.09); g.add(f);
+  }
+  const c=sph(.06,0xffe36b); c.position.y=.4; g.add(c);
+  g.position.set(x,0,z); scene.add(g); return g;
+}
+function spawnAllen(x,z,ry=0){
+  const c = makeCharacter({ shirt:0x3b7fe0, pants:0x2b3a55, hair:0x2a2320, glasses:true });
+  c.position.set(x,0,z); c.rotation.y=ry; scene.add(c);
+  game.allen=c; game.chars.push(c); return c;
+}
+function spawnTammy(x,z,ry=0){
+  const c = makeCharacter({ shirt:0xffffff, pants:0xc9a7d8, hair:0x4a3226, longHair:true, skirt:true });
+  c.position.set(x,0,z); c.rotation.y=ry; scene.add(c);
+  game.tammy=c; game.chars.push(c); return c;
+}
+function spawnJoshua(x,z){
+  const c = makeCharacter({ shirt:0xfff3d6, pants:0xf0e0b8, hair:0xf7f2e8, glow:true });
+  c.position.set(x,0,z); c.userData.float=true; scene.add(c);
+  game.joshua=c; game.chars.push(c); return c;
+}
+
+/* ---------- 场景一：茶空间 ---------- */
+function buildTeaHouse() {
+  clearScene();
+  scene.background = new THREE.Color(0xf6e3cf);
+  scene.fog = new THREE.Fog(0xf6e3cf, 24, 46);
+  baseLight(0xfff4e0, 0xcbb190, 0xffe9c8, [8,14,6], 1.5);
+  const warm = new THREE.PointLight(0xffc98a, 28, 26); warm.position.set(0,4.5,0); scene.add(warm);
+
+  ground(0xd9c3a5, 30);
+  game.worldBounds = { minX:-11, maxX:11, minZ:-11, maxZ:11 };
+
+  const back = box(26,5,.4, 0xf0e0cc); back.position.set(0,2.5,-12.5); scene.add(back);
+  const left = box(.4,5,26, 0xefe4d2); left.position.set(-12.5,2.5,0); scene.add(left);
+  const right = left.clone(); right.position.x=12.5; scene.add(right);
+  for (let i=-2;i<=2;i++){ const beam=box(.3,.3,25,0x8a6242); beam.position.set(i*5,4.8,0); scene.add(beam); }
+  // 吊灯
+  for (const [lx,lz] of [[-6,0],[6,0]]) {
+    const lamp = new THREE.Group();
+    const cord = cyl(.02,.02,1.2,0x5a4232); cord.position.y=4.2; lamp.add(cord);
+    const shade = cyl(.4,.55,.4,0xd88a5a); shade.position.y=3.5; lamp.add(shade);
+    const bulb = sph(.12,0xffe9b0,{emissive:0xffdf9a,emissiveIntensity:2}); bulb.position.y=3.35; lamp.add(bulb);
+    lamp.position.set(lx,0,lz); scene.add(lamp);
+  }
+
+  function teaTable(x,z){
+    const t=new THREE.Group();
+    const top=cyl(1.1,1.1,.12,0x9a7350,24); top.position.y=.85; t.add(top);
+    const leg=cyl(.1,.14,.85,0x7a5940); leg.position.y=.42; t.add(leg);
+    for(let i=0;i<3;i++){
+      const cup=cyl(.09,.07,.12,0x9fd8c8,14,{roughness:.3});
+      const a=i/3*Math.PI*2+x; cup.position.set(Math.cos(a)*.5,.97,Math.sin(a)*.5); t.add(cup);
+    }
+    const pot=sph(.2,0x86b8a8,{roughness:.35}); pot.position.y=1.0; pot.scale.y=.75; t.add(pot);
+    const spout=cyl(.03,.05,.25,0x86b8a8); spout.rotation.z=1.1; spout.position.set(.24,1.02,0); t.add(spout);
+    t.position.set(x,0,z); scene.add(t);
+    for(const s of [-1,1]){ const cush=cyl(.42,.46,.16,0xc98f6e,18); cush.position.set(x+s*1.7,.08,z); scene.add(cush); }
+  }
+  teaTable(-6,-4); teaTable(6,-5); teaTable(-6,4); teaTable(5.5,4.5);
+
+  const shelf = new THREE.Group();
+  const frame = box(4.4,2.6,.5,0x7a5940); frame.position.y=1.6; shelf.add(frame);
+  for(let r=0;r<2;r++)for(let c=0;c<4;c++){
+    const cup=cyl(.13,.1,.2,0x9fd8c8,14,{roughness:.25});
+    cup.position.set(-1.5+c*1,.95+r*1.05,.3); shelf.add(cup);
+  }
+  shelf.position.set(0,0,-11.8); scene.add(shelf);
+  const specialCup = cyl(.15,.11,.22,0xaef0dd,16,{roughness:.15,emissive:0x2a6b58,emissiveIntensity:.6});
+  specialCup.position.set(1.5,1.06,-11.5); scene.add(specialCup);
+  game.animated.push((t)=>{ specialCup.rotation.y=t*.8; specialCup.position.y=1.06+Math.sin(t*2)*.03; });
+
+  makeTree(-10,9,.9,0x8fbf78); makeTree(10,9,.85,0x9cc985);
+  makeFlowerPot(-3,8); makeFlowerPot(3,8,0xd88bff); makeFlowerPot(-9,-9,0xffb26b); makeFlowerPot(9,-9);
+
+  const bar = box(6,.9,1.4,0x8a6242); bar.position.set(-8,.45,-10.5); scene.add(bar);
+  const kettle = sph(.28,0x555a66,{metalness:.6,roughness:.3}); kettle.position.set(-8,1.1,-10.5); scene.add(kettle);
+  // 壶嘴蒸汽
+  const steamMat = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:.35 });
+  const steam = new THREE.Mesh(new THREE.SphereGeometry(.06,8,8), steamMat);
+  steam.position.set(-8,1.45,-10.5); scene.add(steam);
+  game.animated.push((t)=>{ steam.position.y=1.45+((t*.5)%.6); steamMat.opacity=.4-((t*.5)%.6)*.6; });
+}
+
+/* ---------- 场景二：海边（白天/黄昏切换用参数） ---------- */
+function buildBeach() {
+  clearScene();
+  scene.background = new THREE.Color(0xffcf9a);
+  scene.fog = new THREE.Fog(0xffcf9a, 40, 95);
+  baseLight(0xffe2b8, 0x9a7a70, 0xffb87e, [-6,9,-20], 2.0);
+
+  ground(0xeed5a8, 64);
+  game.worldBounds = { minX:-20, maxX:20, minZ:-8, maxZ:16 };
+
+  const seaGeo = new THREE.PlaneGeometry(130, 70, 64, 32);
+  const sea = new THREE.Mesh(seaGeo, new THREE.MeshStandardMaterial({
+    color:0xff9a6e, roughness:.35, metalness:.25, transparent:true, opacity:.94,
+  }));
+  sea.rotation.x=-Math.PI/2; sea.position.set(0,.06,-44); scene.add(sea);
+  const seaPos = seaGeo.attributes.position;
+  const seaBase = seaPos.array.slice();
+  game.animated.push((t)=>{
+    for(let i=0;i<seaPos.count;i++){
+      const x=seaBase[i*3], y=seaBase[i*3+1];
+      seaPos.array[i*3+2] = Math.sin(x*.25+t*1.4)*.28 + Math.cos(y*.3+t*1.1)*.22;
+    }
+    seaPos.needsUpdate=true;
+  });
+
+  const sun = new THREE.Mesh(new THREE.SphereGeometry(4.5,32,32),
+    new THREE.MeshBasicMaterial({ color:0xffdf9e }));
+  sun.position.set(0,8,-80); scene.add(sun);
+  const glowS = new THREE.Mesh(new THREE.SphereGeometry(7,32,32),
+    new THREE.MeshBasicMaterial({ color:0xffb36b, transparent:true, opacity:.35 }));
+  glowS.position.copy(sun.position); scene.add(glowS);
+  game.animated.push((t)=>{ glowS.scale.setScalar(1+Math.sin(t*1.5)*.05); });
+
+  // 防波堤（沿岸）
+  const pier = new THREE.Group();
+  for(let i=0;i<9;i++){
+    const rock = box(2.3,1.05,2.1, i%2?0x9a8f88:0x8a8078);
+    rock.position.set(-9+i*2.25,.52,-7.2); rock.rotation.y=(Math.random()-.5)*.18;
+    pier.add(rock);
+  }
+  scene.add(pier);
+
+  // 炸鱼薯条小摊
+  const stand = new THREE.Group();
+  const cart = box(2.4,1.5,1.4,0xd8443c); cart.position.y=1; stand.add(cart);
+  const roofP = box(2.8,.14,1.8,0xfff1d6); roofP.position.y=2.5; stand.add(roofP);
+  for(const s of [-1,1]){ const pole=cyl(.05,.05,1.6,0xffffff); pole.position.set(s*1.2,1.9,.7); stand.add(pole); }
+  const fries = box(.5,.4,.4,0xffce6b); fries.position.set(.4,1.95,0); stand.add(fries);
+  stand.position.set(-13,0,4); stand.rotation.y=.5; scene.add(stand);
+
+  // 海鸥
+  for(let i=0;i<4;i++){
+    const gull = new THREE.Group();
+    const b=sph(.16,0xffffff); gull.add(b);
+    const w1=box(.5,.03,.16,0xf0f0f0); w1.position.x=-.3; gull.add(w1);
+    const w2=w1.clone(); w2.position.x=.3; gull.add(w2);
+    scene.add(gull);
+    const phase=i*1.7, r=9+i*3;
+    game.animated.push((t)=>{
+      gull.position.set(Math.cos(t*.4+phase)*r, 6+Math.sin(t*.9+phase), -16+Math.sin(t*.4+phase)*6);
+      w1.rotation.z = Math.sin(t*8+phase)*.5;
+      w2.rotation.z = -Math.sin(t*8+phase)*.5;
+    });
+  }
+
+  makeTree(-17,10,1.3,0x6fae5f); makeTree(16,11,1.1,0x7fbf6f); makeTree(-16,-2,1,0x6fae5f);
+  return { sun, glowS };
+}
+
+/* ---------- 场景三：夜晚草甸（萤火虫） ---------- */
+function buildMeadowNight() {
+  clearScene();
+  scene.background = new THREE.Color(0x0e1428);
+  scene.fog = new THREE.Fog(0x0e1428, 24, 60);
+  scene.add(new THREE.HemisphereLight(0x3a4a78, 0x101a14, .5));
+  const moonlight = new THREE.DirectionalLight(0x8fa8d8, .6);
+  moonlight.position.set(-10,16,-8); moonlight.castShadow=true;
+  moonlight.shadow.mapSize.set(2048,2048);
+  const s=24; Object.assign(moonlight.shadow.camera,{left:-s,right:s,top:s,bottom:-s,far:90});
+  scene.add(moonlight);
+
+  ground(0x24402e, 48);
+  game.worldBounds = { minX:-16, maxX:16, minZ:-14, maxZ:12 };
+
+  // 月亮 & 星星
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(2.6,32,32),
+    new THREE.MeshBasicMaterial({ color:0xf5f0dc }));
+  moon.position.set(-16,17,-38); scene.add(moon);
+  const starGeo = new THREE.BufferGeometry();
+  const starN = 350, sp2 = new Float32Array(starN*3);
+  for(let i=0;i<starN;i++){
+    const a=Math.random()*Math.PI*2, r=40+Math.random()*50;
+    sp2[i*3]=Math.cos(a)*r; sp2[i*3+1]=8+Math.random()*40; sp2[i*3+2]=Math.sin(a)*r-10;
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(sp2,3));
+  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color:0xdde8ff, size:.3, transparent:true, opacity:.9 }));
+  scene.add(stars);
+  game.animated.push((t)=>{ stars.material.opacity = .7+Math.sin(t*1.3)*.2; });
+
+  // 小池塘
+  const pond = new THREE.Mesh(new THREE.CircleGeometry(4,36),
+    new THREE.MeshStandardMaterial({ color:0x2a4868, roughness:.05, metalness:.6 }));
+  pond.rotation.x=-Math.PI/2; pond.position.set(9,.02,-8); scene.add(pond);
+
+  // 草丛
+  for(let i=0;i<40;i++){
+    const gr = new THREE.Mesh(new THREE.ConeGeometry(.1+Math.random()*.12,.4+Math.random()*.5,5), M(0x3a5f42));
+    gr.position.set(Math.random()*30-15, .2, Math.random()*24-12);
+    if (gr.position.distanceTo(new THREE.Vector3(9,0,-8)) < 4.5) continue;
+    scene.add(gr);
+  }
+  makeTree(-12,-10,1.4,0x2f5040); makeTree(13,4,1.2,0x2f5040); makeTree(-13,6,1,0x2f5040); makeTree(4,-12,1.3,0x2f5040);
+
+  // 野餐毯 + 灯笼 + 玻璃罐
+  const blanket = box(2.6,.05,2,0xd88a9a); blanket.position.set(-3,.03,3); scene.add(blanket);
+  for (const [lx,lz] of [[-5,2],[-1,4.5]]) {
+    const lg = new THREE.Group();
+    const pole=cyl(.04,.04,1.3,0x5a4232); pole.position.y=.65; lg.add(pole);
+    const paper=cyl(.22,.22,.36,0xffd9a0,12,{emissive:0xffc07a,emissiveIntensity:1.2}); paper.position.y=1.2; lg.add(paper);
+    const l=new THREE.PointLight(0xffc07a,8,8); l.position.y=1.2; lg.add(l);
+    lg.position.set(lx,0,lz); scene.add(lg);
+  }
+  const jar = new THREE.Group();
+  const glass = cyl(.3,.3,.5,0xcfe8e0,16,{transparent:true,opacity:.35,roughness:.1});
+  glass.position.y=.25; jar.add(glass);
+  const lid = cyl(.32,.32,.06,0xb5a642); lid.position.y=.53; jar.add(lid);
+  const jarLight = new THREE.PointLight(0xd8ff9a, 0, 6); jarLight.position.y=.3; jar.add(jarLight);
+  jar.position.set(-3,.06,3); scene.add(jar);
+  return { jar, jarLight };
+}
+
+/* ---------- 通用：飘落的枫叶 ---------- */
+function autumnLeaves(count, area) {
+  const colors=[0xd86a3a,0xe89a4a,0xc0503a];
+  const leaves=[];
+  for(let i=0;i<count;i++){
+    const l=new THREE.Mesh(new THREE.PlaneGeometry(.18,.18),
+      new THREE.MeshBasicMaterial({ color:colors[i%3], side:THREE.DoubleSide, transparent:true, opacity:.9 }));
+    l.position.set(area.minX+Math.random()*(area.maxX-area.minX), 1+Math.random()*5,
+                   area.minZ+Math.random()*(area.maxZ-area.minZ));
+    scene.add(l);
+    leaves.push({ l, ph:Math.random()*8, sp:.35+Math.random()*.5 });
+  }
+  game.animated.push((t,dt)=>{
+    for(const o of leaves){
+      o.l.position.y -= o.sp*dt;
+      o.l.position.x += Math.sin(t*1.5+o.ph)*.35*dt;
+      o.l.rotation.x = t*1.2+o.ph; o.l.rotation.z = t*.9+o.ph;
+      if(o.l.position.y < .05) o.l.position.y = 5+Math.random()*2;
+    }
+  });
+}
+
+/* ---------- 通用：自行车 ---------- */
+function giveBike(c, color, basket=false) {
+  const b = new THREE.Group();
+  const wm = new THREE.MeshStandardMaterial({ color:0x24262a, roughness:.6 });
+  const wheels = [];
+  for (const s of [-1,1]) {
+    const wg = new THREE.Group();
+    const tor = new THREE.Mesh(new THREE.TorusGeometry(.3,.05,10,22), wm); tor.rotation.y=Math.PI/2; wg.add(tor);
+    const spoke = new THREE.Mesh(new THREE.BoxGeometry(.02,.56,.02), wm); wg.add(spoke);
+    const spoke2 = spoke.clone(); spoke2.rotation.x=Math.PI/2; wg.add(spoke2);
+    wg.position.set(0,.3,s*.55);
+    b.add(wg); wheels.push(wg);
+  }
+  const frame = box(.06,.06,1.15,color); frame.position.set(0,.52,0); b.add(frame);
+  const tube = box(.06,.5,.06,color); tube.rotation.x=.3; tube.position.set(0,.72,-.32); b.add(tube);
+  const seat = box(.24,.06,.34,0x3a3230); seat.position.set(0,.95,-.3); b.add(seat);
+  const post = box(.05,.55,.05,color); post.rotation.x=-.25; post.position.set(0,.75,.45); b.add(post);
+  const bar = box(.5,.05,.05,0x3a3230); bar.position.set(0,1.0,.52); b.add(bar);
+  if (basket) {
+    const bk = box(.34,.22,.3,0x8a6242); bk.position.set(0,.85,.74); b.add(bk);
+    const fl = sph(.08,0xff7f9c); fl.position.set(.05,1,.74); b.add(fl);
+  }
+  b.position.y = -.3;   // 抵消角色坐上车座后的抬升
+  c.add(b);
+  c.userData.bike = b; c.userData.wheels = wheels;
+  c.userData.riding = true; c.userData.baseY = .3;
+}
+function removeBike(c) {
+  if (c.userData.bike) c.remove(c.userData.bike);
+  c.userData.bike = null; c.userData.wheels = null;
+  c.userData.riding = false; c.userData.baseY = 0;
+}
+
+/* ---------- 场景·煤气镇 Gastown（红砖街 + 蒸汽钟） ---------- */
+function buildGastown() {
+  clearScene();
+  scene.background = new THREE.Color(0xf0d0a8);
+  scene.fog = new THREE.Fog(0xf0d0a8, 26, 55);
+  baseLight(0xffe8c8, 0xa08068, 0xffd9a0, [10,14,8], 1.4);
+
+  ground(0x6a6058, 40);
+  game.worldBounds = { minX:-8, maxX:8, minZ:-12, maxZ:11 };
+
+  // 石板路
+  for(let i=0;i<26;i++){
+    const st = new THREE.Mesh(new THREE.CircleGeometry(.35+Math.random()*.3, 8), M(0x5a5048,{roughness:1}));
+    st.rotation.x=-Math.PI/2; st.position.set(Math.random()*16-8,.015,Math.random()*22-12);
+    scene.add(st);
+  }
+  // 红砖楼（两侧）
+  function brickBuilding(x,z,w,h,c){
+    const b = box(w,h,3,c); b.position.set(x,h/2,z); scene.add(b);
+    const zin = z<0 ? z+1.56 : z-1.56;
+    for(let r2=1;r2<Math.floor(h/1.6);r2++)for(let k=0;k<Math.floor(w/1.6);k++){
+      const win = box(.7,.9,.1, 0xffd98a, {emissive:0xffc76b, emissiveIntensity: Math.random()<.6?1:.15});
+      win.position.set(x-w/2+1+k*1.6, r2*1.6, zin);
+      scene.add(win);
+    }
+    const aw = new THREE.Group();
+    for(let k=0;k<Math.floor(w/.8);k++){
+      const seg = box(.8,.08,1.2, k%2?0xa83232:0xf0e8d8);
+      seg.position.set(-w/2+.4+k*.8,0,0); aw.add(seg);
+    }
+    aw.position.set(x, 2.4, z<0 ? z+2.1 : z-2.1);
+    aw.rotation.x = z<0 ? .25 : -.25;
+    scene.add(aw);
+  }
+  brickBuilding(-4,-14.5,9,7,0x8a4a3a);
+  brickBuilding(5,-14.5,8,9,0x7a4034);
+  // 南侧（镜头这一侧）只放矮店面，避免挡住视线
+  brickBuilding(-4,13.5,10,2.4,0x93503e);
+  brickBuilding(6,13.5,7,2.2,0x7a4438);
+
+  // 街灯串
+  for (const lz of [-3, 6]) {
+    for(let i=0;i<=14;i++){
+      const bx=-7+i;
+      const by=3.6 - Math.sin((i/14)*Math.PI)*.8;
+      const bulb=new THREE.Mesh(new THREE.SphereGeometry(.06,8,8), new THREE.MeshBasicMaterial({color:0xffe9b0}));
+      bulb.position.set(bx,by,lz); scene.add(bulb);
+    }
+  }
+  // 黑铁路灯
+  for (const [lx,lz] of [[-6,-8],[6,-8],[-6,4],[6,4]]) {
+    const g=new THREE.Group();
+    const pole=cyl(.07,.09,3.6,0x2a2a30); pole.position.y=1.8; g.add(pole);
+    const head=sph(.22,0xffe9b0,{emissive:0xffdf9a,emissiveIntensity:1.6}); head.position.y=3.7; g.add(head);
+    const l=new THREE.PointLight(0xffdf9a,10,10); l.position.y=3.6; g.add(l);
+    g.position.set(lx,0,lz); scene.add(g);
+  }
+
+  // —— 蒸汽钟 ——
+  const clockG = new THREE.Group();
+  const base = box(1,.5,1,0x6a5a3a); base.position.y=.25; clockG.add(base);
+  const col = cyl(.28,.34,2.6,0xb08d4a,10,{metalness:.55,roughness:.35}); col.position.y=1.8; clockG.add(col);
+  const headBox = box(.9,.9,.9,0xb08d4a,{metalness:.55,roughness:.35}); headBox.position.y=3.5; clockG.add(headBox);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(.72,.6,4), M(0x8a6a3a,{metalness:.5}));
+  roof.position.y=4.25; roof.rotation.y=Math.PI/4; clockG.add(roof);
+  const hands=[];
+  for (let i=0;i<4;i++){
+    const a=i*Math.PI/2;
+    const face = new THREE.Mesh(new THREE.CircleGeometry(.3,24), new THREE.MeshBasicMaterial({color:0xfff8e8}));
+    face.position.set(Math.sin(a)*.47, 3.5, Math.cos(a)*.47); face.rotation.y=a; clockG.add(face);
+    const hand = new THREE.Mesh(new THREE.PlaneGeometry(.035,.4), new THREE.MeshBasicMaterial({color:0x333333}));
+    hand.position.set(Math.sin(a)*.48, 3.5, Math.cos(a)*.48); hand.rotation.y=a; clockG.add(hand);
+    hands.push(hand);
+  }
+  clockG.position.set(0,0,-6.5); scene.add(clockG);
+  game.animated.push((t)=>{ for (const h of hands) h.rotation.z = -t*.5; });
+
+  // 蒸汽（周期喷发）
+  let steamOn = false, prevOn = false;
+  const puffs = [];
+  for (let i=0;i<10;i++){
+    const cv=document.createElement('canvas'); cv.width=cv.height=64;
+    const cx=cv.getContext('2d');
+    const grad=cx.createRadialGradient(32,32,2,32,32,30);
+    grad.addColorStop(0,'rgba(255,255,255,.95)'); grad.addColorStop(1,'rgba(255,255,255,0)');
+    cx.fillStyle=grad; cx.fillRect(0,0,64,64);
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false}));
+    sp.visible=false; scene.add(sp);
+    puffs.push({sp, life:99});
+  }
+  game.animated.push((t,dt)=>{
+    steamOn = (t % 9) < 2;
+    if (steamOn && !prevOn) SFX.whistle();
+    prevOn = steamOn;
+    for (const p of puffs){
+      if (p.life > 2){
+        if (steamOn && Math.random()<.3){
+          p.life=0; p.sp.visible=true;
+          p.sp.position.set((Math.random()-.5)*.3, 4.4, -6.5+(Math.random()-.5)*.3);
+          p.sp.scale.setScalar(.3);
+        }
+        continue;
+      }
+      p.life+=dt;
+      p.sp.position.y += dt*1.4;
+      p.sp.scale.setScalar(.3+p.life*.6);
+      p.sp.material.opacity = Math.max(0, .85 - p.life*.5);
+      if (p.life>2) p.sp.visible=false;
+    }
+  });
+
+  makeTree(-7,-1,1.1,0xd8763a); makeTree(7,8,1,0xe0824a); makeTree(-7,9,.9,0xd8763a);
+  autumnLeaves(22, {minX:-8,maxX:8,minZ:-11,maxZ:10});
+  makeFlowerPot(-2,8,0xffb26b); makeFlowerPot(3,-9,0xd88bff);
+
+  return { isSteaming: () => steamOn };
+}
+
+/* ---------- 场景·格兰维尔岛 Granville Island（公共市场） ---------- */
+function buildGranville() {
+  clearScene();
+  scene.background = new THREE.Color(0xbfe0f0);
+  scene.fog = new THREE.Fog(0xbfe0f0, 36, 85);
+  baseLight(0xffffff, 0x88a0b0, 0xfff2d8, [10,16,6], 1.8);
+
+  ground(0x9aa4a8, 42);
+  game.worldBounds = { minX:-13, maxX:13, minZ:-9, maxZ:9 };
+
+  // False Creek 水面
+  const seaGeo = new THREE.PlaneGeometry(120, 40, 48, 16);
+  const sea = new THREE.Mesh(seaGeo, new THREE.MeshStandardMaterial({
+    color:0x4a90b8, roughness:.3, metalness:.3, transparent:true, opacity:.95 }));
+  sea.rotation.x=-Math.PI/2; sea.position.set(0,.05,-30); scene.add(sea);
+  const seaPos = seaGeo.attributes.position, seaBase = seaPos.array.slice();
+  game.animated.push((t)=>{
+    for(let i=0;i<seaPos.count;i++){
+      const x=seaBase[i*3], y=seaBase[i*3+1];
+      seaPos.array[i*3+2] = Math.sin(x*.3+t*1.5)*.15 + Math.cos(y*.4+t)*.12;
+    }
+    seaPos.needsUpdate=true;
+  });
+  // 科学世界球（远景）
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(4.5,18,14),
+    new THREE.MeshStandardMaterial({ color:0xcfd8e0, metalness:.7, roughness:.3 }));
+  dome.position.set(16,5,-36); scene.add(dome);
+  const domeBase = box(7,2.5,7,0x8a94a0); domeBase.position.set(16,1.2,-36); scene.add(domeBase);
+  // 彩色小渡轮（bobbing）
+  const boat = new THREE.Group();
+  const hull = box(1.6,.5,.8,0x3a8ac0); hull.position.y=.25; boat.add(hull);
+  const cabin = box(1,.6,.6,0xf0e8d8); cabin.position.y=.8; boat.add(cabin);
+  const croof = box(1.2,.1,.7,0xd8443c); croof.position.y=1.15; boat.add(croof);
+  boat.position.set(-9,0,-14); scene.add(boat);
+  game.animated.push((t)=>{ boat.position.y=Math.sin(t*1.2)*.12; boat.rotation.z=Math.sin(t*.9)*.04; boat.position.x=-9+Math.sin(t*.15)*3; });
+
+  // 市场摊位
+  function stall(x,z,awnColor,goodsColors,faceCenter=true){
+    const g=new THREE.Group();
+    const counter=box(2.6,.9,1.1,0x9a7350); counter.position.y=.45; g.add(counter);
+    for(const s of [-1,1]){ const pole=cyl(.05,.05,2.2,0x6a5240); pole.position.set(s*1.2,1.1,-.4); g.add(pole); }
+    for(let k=0;k<4;k++){
+      const seg=box(.75,.08,1.5, k%2?awnColor:0xf5f0e0);
+      seg.position.set(-1.1+k*.75,2.25,0); seg.rotation.x=.2; g.add(seg);
+    }
+    for(let k=0;k<goodsColors.length;k++){
+      const it=sph(.16,goodsColors[k]); it.position.set(-.8+k*.5,1.05,.15); g.add(it);
+    }
+    g.position.set(x,0,z);
+    if(faceCenter) g.rotation.y = Math.atan2(-x, -z);
+    scene.add(g); return g;
+  }
+  stall(-10,-6, 0x3a8ac0, [0xff8a6a,0xff8a6a,0xd8687a]);           // 鱼摊
+  stall(-10, 4, 0xd8a03a, [0xd8a05a,0xc08a4a,0xe8c88a]);           // 面包房
+  stall(  0,-7, 0xe8c840, [0xf5e2a8,0xf0d890,0xe8cc80]);           // 奶酪摊
+  stall( 10,-6, 0xd8443c, [0xe04848,0xe86060,0x8ac04a]);           // 果蔬摊
+  stall( 10, 4, 0xc06ad8, [0xffd84a,0xff8fa3,0xd88bff]);           // 花店
+  stall(  0, 7, 0xa8622a, [0xb5651d,0xa8622a,0xc07a3a], false);    // 枫糖摊
+
+  // 海鸥
+  for(let i=0;i<5;i++){
+    const gull = new THREE.Group();
+    const b=sph(.16,0xffffff); gull.add(b);
+    const w1=box(.5,.03,.16,0xf0f0f0); w1.position.x=-.3; gull.add(w1);
+    const w2=w1.clone(); w2.position.x=.3; gull.add(w2);
+    scene.add(gull);
+    const phase=i*1.4, r=7+i*2.5;
+    game.animated.push((t)=>{
+      gull.position.set(Math.cos(t*.5+phase)*r, 5+Math.sin(t*.9+phase), -6+Math.sin(t*.5+phase)*5);
+      w1.rotation.z = Math.sin(t*8+phase)*.5;
+      w2.rotation.z = -Math.sin(t*8+phase)*.5;
+    });
+  }
+  makeTree(-12,8,1,0x7fae6a); makeTree(12,8,1.1,0x8fbf78);
+  makeFlowerPot(-4,0,0xffd84a); makeFlowerPot(4,0,0xff7f9c);
+
+  // 街头小提琴艺人
+  const busker = makeCharacter({ shirt:0x6a4a8a, pants:0x3a3230, hair:0x6a5242 });
+  busker.position.set(5,0,1.5); busker.rotation.y=-.6; scene.add(busker); game.chars.push(busker);
+  const violin = box(.14,.34,.06,0x8a4a2a); violin.position.set(-.28,1.42,.18); violin.rotation.z=.5; busker.add(violin);
+  const bowB = box(.02,.4,.02,0x3a3230); bowB.position.set(.3,1.4,.2); bowB.rotation.z=-.6; busker.add(bowB);
+  const caseB = box(.9,.12,.35,0x3a3230); caseB.position.set(6.2,.06,2.2); scene.add(caseB);
+  let noteT=0;
+  game.animated.push((t,dt)=>{
+    noteT-=dt;
+    if(noteT<=0){ noteT=2.2; emote(busker,'🎵',1.6); }
+    busker.userData.rig.armR.rotation.x = -.5+Math.sin(t*3)*.3;
+  });
+  return { busker };
+}
+
+/* ---------- 场景·斯坦利公园 Stanley Park（海堤 + 图腾柱 + 狮门大桥） ---------- */
+function buildStanleyPark() {
+  clearScene();
+  scene.background = new THREE.Color(0xffdba8);
+  scene.fog = new THREE.Fog(0xffdba8, 55, 120);
+  baseLight(0xffe8c0, 0x9a8a70, 0xffc888, [-14,10,-10], 1.9);
+
+  ground(0x7fae6a, 95);
+  const path = new THREE.Mesh(new THREE.PlaneGeometry(72,4.5), M(0xb8b0a4,{roughness:1}));
+  path.rotation.x=-Math.PI/2; path.position.set(0,.02,-2); path.receiveShadow=true; scene.add(path);
+  game.worldBounds = { minX:-31, maxX:31, minZ:-4, maxZ:9 };
+
+  // 海（日落色）
+  const seaGeo = new THREE.PlaneGeometry(160, 55, 64, 20);
+  const sea = new THREE.Mesh(seaGeo, new THREE.MeshStandardMaterial({
+    color:0xe8905e, roughness:.35, metalness:.25, transparent:true, opacity:.95 }));
+  sea.rotation.x=-Math.PI/2; sea.position.set(0,.04,-33); scene.add(sea);
+  const seaPos = seaGeo.attributes.position, seaBase = seaPos.array.slice();
+  game.animated.push((t)=>{
+    for(let i=0;i<seaPos.count;i++){
+      const x=seaBase[i*3], y=seaBase[i*3+1];
+      seaPos.array[i*3+2] = Math.sin(x*.2+t*1.3)*.25 + Math.cos(y*.25+t)*.18;
+    }
+    seaPos.needsUpdate=true;
+  });
+  // 落日
+  const sunM = new THREE.Mesh(new THREE.SphereGeometry(5,32,32), new THREE.MeshBasicMaterial({ color:0xffd88e }));
+  sunM.position.set(-20,6,-75); scene.add(sunM);
+  const glowS = new THREE.Mesh(new THREE.SphereGeometry(8,32,32),
+    new THREE.MeshBasicMaterial({ color:0xffab60, transparent:true, opacity:.32 }));
+  glowS.position.copy(sunM.position); scene.add(glowS);
+
+  // 狮门大桥剪影
+  const bridgeMat = M(0x3f6a55,{roughness:.8});
+  const deck = box(30,.5,1.2,0x3f6a55); deck.position.set(-26,7,-52); scene.add(deck);
+  for (const tx of [-36,-16]) {
+    const tower = box(1.2,14,1.2,0x3f6a55); tower.position.set(tx,7,-52); scene.add(tower);
+  }
+  // 悬索（斜方块近似）
+  for (let i=0;i<8;i++) {
+    const c1 = box(4.6,.14,.14,0x3f6a55);
+    const xx = -36 + i*2.6;
+    const sag = Math.abs(Math.sin((i/7)*Math.PI))*4;
+    c1.position.set(xx+1.3, 14-sag*.9, -52);
+    c1.rotation.z = (i<4?-1:1) * .32;
+    scene.add(c1);
+  }
+  // 远山
+  for (const [mx,mh] of [[-45,10],[-10,8],[25,11],[50,9]]) {
+    const m2 = new THREE.Mesh(new THREE.ConeGeometry(14,mh,5), M(0xb0a0c0,{roughness:1}));
+    m2.position.set(mx, mh/2, -70); scene.add(m2);
+  }
+
+  // 森林（草地一侧）
+  for (let i=0;i<26;i++) {
+    makeTree(-30+Math.random()*52, 5.5+Math.random()*3, .7+Math.random()*.4,
+      [0x2f5e40,0x3a6a4a,0xd8763a][i%3]);
+  }
+  autumnLeaves(20, {minX:-28,maxX:28,minZ:-3,maxZ:8});
+
+  // 图腾柱（东端）
+  const totemColors = [0xc03a2a,0x2a6a4a,0xd8a03a,0x3a4a8a,0xc03a2a];
+  function totem(x,z,h){
+    const g=new THREE.Group();
+    for(let i=0;i<h;i++){
+      const seg=cyl(.42,.45,.8,totemColors[i%5],10); seg.position.y=.4+i*.8; g.add(seg);
+      const eye=sph(.08,0xf5f0e0); eye.position.set(.18,.5+i*.8,.36); g.add(eye);
+      const eye2=eye.clone(); eye2.position.x=-.18; g.add(eye2);
+    }
+    const wing=box(2.2,.5,.14,0x8a3a2a); wing.position.y=h*.8-.3; g.add(wing);
+    const beak=new THREE.Mesh(new THREE.ConeGeometry(.2,.7,6),M(0xd8a03a));
+    beak.rotation.x=Math.PI/2; beak.position.set(0,h*.8-.1,.6); g.add(beak);
+    g.position.set(x,0,z); scene.add(g);
+  }
+  totem(25,5.5,5); totem(27.5,6.5,4); totem(29.5,5,6);
+
+  // 面海长椅
+  const bench = new THREE.Group();
+  const seat=box(2.2,.12,.55,0x8a6242); seat.position.y=.55; bench.add(seat);
+  const backB=box(2.2,.5,.12,0x8a6242); backB.position.set(0,.95,.28); bench.add(backB);
+  for(const s of [-1,1]){ const leg=box(.12,.55,.5,0x5a4232); leg.position.set(s*.95,.27,0); bench.add(leg); }
+  bench.position.set(26,0,-2.6); scene.add(bench);
+
+  // 加拿大鹅一家（沿草地散步）
+  const geese=[];
+  for(let i=0;i<3;i++){
+    const goose=new THREE.Group();
+    const gb=sph(.2,0x6a5a4a); gb.scale.set(1.3,.9,.9); gb.position.y=.3; goose.add(gb);
+    const neck=cyl(.05,.06,.35,0x1a1a1a); neck.position.set(.2,.55,0); neck.rotation.z=-.3; goose.add(neck);
+    const gh=sph(.09,0x1a1a1a); gh.position.set(.3,.72,0); goose.add(gh);
+    const cheek=box(.06,.08,.02,0xf5f0e0); cheek.position.set(.3,.68,.08); goose.add(cheek);
+    goose.position.set(-8+i*1.4,0,5+i*.8); scene.add(goose); geese.push(goose);
+  }
+  game.animated.push((t)=>{
+    for(let i=0;i<geese.length;i++){
+      geese[i].position.x = -8+i*1.4 + Math.sin(t*.3+i)*3;
+      geese[i].rotation.y = Math.cos(t*.3+i)>0 ? Math.PI/2 : -Math.PI/2;
+      geese[i].position.y = Math.abs(Math.sin(t*4+i*2))*.04;
+    }
+  });
+  return { bench };
+}
+
+/* ---------- 场景四：雨夜街道 ---------- */
+function buildRainStreet() {
+  clearScene();
+  scene.background = new THREE.Color(0x1c2233);
+  scene.fog = new THREE.Fog(0x1c2233, 16, 42);
+  scene.add(new THREE.HemisphereLight(0x4a5878, 0x1a1e2a, .55));
+
+  ground(0x2e3442, 44);
+  game.worldBounds = { minX:-14, maxX:14, minZ:-9, maxZ:12 };
+
+  for(let i=0;i<10;i++){
+    const puddle = new THREE.Mesh(new THREE.CircleGeometry(.5+Math.random()*.9, 20),
+      new THREE.MeshStandardMaterial({ color:0x5a6a92, roughness:.08, metalness:.7 }));
+    puddle.rotation.x=-Math.PI/2; puddle.position.set(Math.random()*22-11,.02,Math.random()*18-8);
+    scene.add(puddle);
+  }
+
+  const house = new THREE.Group();
+  const wall = box(10,6,.6,0x50435a); wall.position.y=3; house.add(wall);
+  const door = box(1.6,2.6,.2,0x7a4a3a); door.position.set(0,1.3,.35); house.add(door);
+  const knob = sph(.06,0xffd76b,{metalness:.7,roughness:.3}); knob.position.set(.55,1.3,.48); house.add(knob);
+  for(const s of [-1,1]){
+    const win = box(1.4,1.4,.15,0xffd98a,{emissive:0xffc76b,emissiveIntensity:1.4});
+    win.position.set(s*3,3.4,.35); house.add(win);
+  }
+  house.position.set(0,0,-11.5); scene.add(house);
+  const doorLight = new THREE.PointLight(0xffc76b, 20, 14); doorLight.position.set(0,3.2,-9.5); scene.add(doorLight);
+
+  function lamp(x,z){
+    const g=new THREE.Group();
+    const pole=cyl(.08,.1,4.4,0x3a3f4c); pole.position.y=2.2; g.add(pole);
+    const head=sph(.3,0xffe9b0,{emissive:0xffdf9a,emissiveIntensity:1.8}); head.position.y=4.5; g.add(head);
+    const l=new THREE.PointLight(0xffdf9a,14,12); l.position.y=4.3; g.add(l);
+    g.position.set(x,0,z); scene.add(g);
+  }
+  lamp(-7,-6); lamp(7,-6); lamp(-9,5); lamp(9,5);
+
+  const rainCount = 1300;
+  const rp = new Float32Array(rainCount*3);
+  for(let i=0;i<rainCount;i++){
+    rp[i*3]=Math.random()*36-18; rp[i*3+1]=Math.random()*14; rp[i*3+2]=Math.random()*30-15;
+  }
+  const rainGeo = new THREE.BufferGeometry();
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(rp,3));
+  const rain = new THREE.Points(rainGeo, new THREE.PointsMaterial({
+    color:0x9ab0d8, size:.08, transparent:true, opacity:.7 }));
+  scene.add(rain);
+  game.animated.push((t,dt)=>{
+    const a=rainGeo.attributes.position.array;
+    for(let i=0;i<rainCount;i++){
+      a[i*3+1]-=dt*11;
+      if(a[i*3+1]<0)a[i*3+1]=14;
+    }
+    rainGeo.attributes.position.needsUpdate=true;
+  });
+
+  const milkTea = new THREE.Group();
+  const cup = cyl(.16,.12,.34,0xf5e2c8,16,{emissive:0xffd9a0,emissiveIntensity:.35});
+  cup.position.y=.17; milkTea.add(cup);
+  const lid2 = sph(.16,0xfff5e5); lid2.scale.y=.4; lid2.position.y=.36; milkTea.add(lid2);
+  const steamMat = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:.4 });
+  const s1=new THREE.Mesh(new THREE.SphereGeometry(.05,8,8),steamMat); s1.position.y=.5; milkTea.add(s1);
+  milkTea.position.set(3,0,-2); scene.add(milkTea);
+  game.animated.push((t)=>{
+    s1.position.y=.5+((t*.4)%.5); steamMat.opacity=.45-((t*.4)%.5)*.7;
+    milkTea.rotation.y=t*.6;
+  });
+  makeTree(-12,2,1,0x3f5e48); makeTree(12,0,1.1,0x3f5e48);
+  return { milkTea };
+}
+
+/* ---------- 场景五：塔米的公寓（她的视角） ---------- */
+function buildApartment() {
+  clearScene();
+  scene.background = new THREE.Color(0x2a2030);
+  scene.fog = new THREE.Fog(0x2a2030, 20, 40);
+  scene.add(new THREE.HemisphereLight(0xffe0b8, 0x40303a, .7));
+  const warm = new THREE.PointLight(0xffc98a, 22, 20); warm.position.set(0,3.6,0); scene.add(warm);
+
+  ground(0xc9a888, 20);
+  game.worldBounds = { minX:-7.5, maxX:7.5, minZ:-7.5, maxZ:7.5 };
+
+  // 墙
+  const back = box(17,4.6,.4,0xe8d5c8); back.position.set(0,2.3,-8.5); scene.add(back);
+  const left = box(.4,4.6,17,0xe0ccc0); left.position.set(-8.5,2.3,0); scene.add(left);
+  const right = left.clone(); right.position.x=8.5; scene.add(right);
+  // 前墙做成半透明——镜头在南侧，实墙会挡住视线
+  const front = box(17,4.6,.4,0xe8d5c8,{transparent:true,opacity:.13,depthWrite:false});
+  front.position.set(0,2.3,8.5); front.castShadow=false; scene.add(front);
+  // 大门（在 front 墙上, 通往外面雨夜）
+  const door = box(1.6,2.6,.25,0x7a4a3a); door.position.set(2,1.3,8.3); scene.add(door);
+  const knob = sph(.06,0xffd76b,{metalness:.7}); knob.position.set(1.5,1.3,8.15); scene.add(knob);
+
+  // 窗（看得见雨）
+  const winFrame = box(3.6,2.4,.5,0x9a7350); winFrame.position.set(-4,2.4,-8.4); scene.add(winFrame);
+  const winGlass = box(3.2,2,.15,0x384868,{roughness:.1,metalness:.3});
+  winGlass.position.set(-4,2.4,-8.3); scene.add(winGlass);
+  // 窗上雨痕（小线条下滑）
+  for(let i=0;i<10;i++){
+    const drop = box(.02,.28,.02,0x9ab0d8,{transparent:true,opacity:.6});
+    const dx = -5.4+Math.random()*2.8;
+    drop.position.set(dx, 2.4, -8.2);
+    scene.add(drop);
+    const spd=.8+Math.random(), ph=Math.random()*3;
+    game.animated.push((t)=>{ drop.position.y = 3.3 - ((t*spd+ph)%1.9); });
+  }
+
+  // 花艺角
+  const desk = box(3,.85,1.2,0xb08968); desk.position.set(-5.5,.42,-6.5); scene.add(desk);
+  const vase = cyl(.2,.28,.5,0xa8d8e8,16,{roughness:.2}); vase.position.set(-5.5,1.1,-6.5); scene.add(vase);
+  const flowerColors=[0xff7f9c,0xffb26b,0xd88bff];
+  for(let i=0;i<6;i++){
+    const stem=cyl(.02,.02,.5,0x5f8f5a); stem.position.set(-5.5+(Math.random()-.5)*.3,1.5,-6.5+(Math.random()-.5)*.2); scene.add(stem);
+    const f=sph(.08,flowerColors[i%3]); f.position.set(stem.position.x,1.78,stem.position.z); scene.add(f);
+  }
+
+  // 沙发 + 茶几 + 手机
+  const sofa = new THREE.Group();
+  const seat=box(2.8,.55,1.2,0xc98a9a); seat.position.y=.45; sofa.add(seat);
+  const backC=box(2.8,.8,.35,0xb87a8a); backC.position.set(0,1,-.45); sofa.add(backC);
+  sofa.position.set(4,0,-6); scene.add(sofa);
+  const table=cyl(.8,.8,.09,0x9a7350,20); table.position.set(4,.48,-3.8); scene.add(table);
+  const tleg=cyl(.07,.1,.48,0x7a5940); tleg.position.set(4,.24,-3.8); scene.add(tleg);
+  const phone = box(.26,.04,.5,0x222831,{roughness:.3});
+  phone.position.set(4,.55,-3.8); scene.add(phone);
+  const phoneGlow = new THREE.Mesh(new THREE.PlaneGeometry(.22,.44),
+    new THREE.MeshBasicMaterial({ color:0x9adcff, transparent:true, opacity:0 }));
+  phoneGlow.rotation.x=-Math.PI/2; phoneGlow.position.set(4,.58,-3.8); scene.add(phoneGlow);
+  game.animated.push((t)=>{ phoneGlow.material.opacity = .3+Math.sin(t*4)*.3; }); // 消息闪烁
+
+  // 地毯 & 猫（彩蛋小猫）
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(2.4,28), M(0xd8b8a8,{roughness:1}));
+  rug.rotation.x=-Math.PI/2; rug.position.set(0,.02,1); scene.add(rug);
+  const cat = new THREE.Group();
+  const catBody = sph(.28,0xe8c9a0); catBody.scale.set(1.3,.8,.9); catBody.position.y=.22; cat.add(catBody);
+  const catHead = sph(.18,0xe8c9a0); catHead.position.set(.32,.38,0); cat.add(catHead);
+  for(const s of [-1,1]){ const ear=new THREE.Mesh(new THREE.ConeGeometry(.06,.12,6),M(0xd8a878)); ear.position.set(.32+.02,.53,s*.09); cat.add(ear); }
+  const tail = cyl(.04,.02,.5,0xe8c9a0); tail.rotation.z=.9; tail.position.set(-.4,.35,0); cat.add(tail);
+  cat.position.set(-1.5,0,3.5); scene.add(cat);
+  game.animated.push((t)=>{ tail.rotation.z = .9+Math.sin(t*2.4)*.25; });
+
+  return { door, cat };
+}
+
+/* ---------- 场景六：几年后的家 ---------- */
+function buildHome() {
+  clearScene();
+  scene.background = new THREE.Color(0xffe7d0);
+  scene.fog = new THREE.Fog(0xffe7d0, 22, 44);
+  baseLight(0xfff2dd, 0xd8b8a0, 0xffe2b0, [6,10,8], 1.6);
+  const warm = new THREE.PointLight(0xffd9a8, 22, 22); warm.position.set(0,4,2); scene.add(warm);
+
+  ground(0xe0c9a8, 26);
+  game.worldBounds = { minX:-9, maxX:9, minZ:-9, maxZ:9 };
+
+  const back = box(22,5.5,.4,0xf5ead8); back.position.set(0,2.75,-10.5); scene.add(back);
+  const winFrame = box(6.5,3.4,.5,0x9a7350); winFrame.position.set(0,2.6,-10.4); scene.add(winFrame);
+  const winGlass = box(6,3,.2,0xbfe3f2,{transparent:true,opacity:.5,roughness:.1});
+  winGlass.position.set(0,2.6,-10.3); scene.add(winGlass);
+  for(let i=0;i<7;i++){
+    const h = 2+Math.random()*3;
+    const b=box(1+Math.random()*1.2, h, 1, 0x8fa8c0);
+    b.position.set(-8+i*2.6, 1+h/2, -16); scene.add(b);
+  }
+  const mount = new THREE.Mesh(new THREE.ConeGeometry(6,4,4), M(0xaebfd5));
+  mount.position.set(6,3,-20); scene.add(mount);
+
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(3.4,32), M(0xe8a8a0,{roughness:1}));
+  rug.rotation.x=-Math.PI/2; rug.position.set(0,.02,0); scene.add(rug);
+  const sofa = new THREE.Group();
+  const seat=box(3.4,.6,1.3,0xd88a7a); seat.position.y=.5; sofa.add(seat);
+  const backC=box(3.4,.9,.4,0xc97a6a); backC.position.set(0,1.1,-.5); sofa.add(backC);
+  for(const s of [-1,1]){ const arm=box(.4,.9,1.3,0xc97a6a); arm.position.set(s*1.7,.75,0); sofa.add(arm); }
+  sofa.position.set(0,0,2.5); sofa.rotation.y=Math.PI; scene.add(sofa);
+  const table=cyl(.9,.9,.1,0x9a7350,24); table.position.set(0,.5,-.5); scene.add(table);
+  const tleg=cyl(.08,.12,.5,0x7a5940); tleg.position.set(0,.25,-.5); scene.add(tleg);
+  for(const s of [-1,1]){ const c=cyl(.09,.07,.12,0x9fd8c8,14,{roughness:.3}); c.position.set(s*.3,.61,-.5); scene.add(c); }
+
+  const flowerDesk = box(3,.85,1.2,0xb08968); flowerDesk.position.set(-6.5,.42,-8.5); scene.add(flowerDesk);
+  const vase = cyl(.2,.28,.5,0xa8d8e8,16,{roughness:.2}); vase.position.set(-6.5,1.1,-8.5); scene.add(vase);
+  const flowerColors=[0xff7f9c,0xffb26b,0xd88bff,0xfff06b];
+  for(let i=0;i<7;i++){
+    const stem=cyl(.02,.02,.55,0x5f8f5a);
+    stem.position.set(-6.5+(Math.random()-.5)*.3,1.55,-8.5+(Math.random()-.5)*.2);
+    stem.rotation.z=(Math.random()-.5)*.5; scene.add(stem);
+    const f=sph(.09,flowerColors[i%4]); f.position.set(stem.position.x+stem.rotation.z*-.5,1.85,stem.position.z); scene.add(f);
+  }
+  makeFlowerPot(4,-8); makeFlowerPot(7,-8,0xd88bff); makeFlowerPot(-8,2,0xffb26b);
+
+  // 相框墙（回忆）
+  const photo = box(1.2,.9,.08,0xffe0b8,{emissive:0xffb36b,emissiveIntensity:.3});
+  photo.position.set(4.5,3,-10.2); scene.add(photo);
+  const frame2 = box(1.4,1.1,.06,0x9a7350); frame2.position.set(4.5,3,-10.25); scene.add(frame2);
+  const photo2 = box(.9,.7,.08,0xcfe8d8,{emissive:0x8fd8a8,emissiveIntensity:.2});
+  photo2.position.set(6.3,2.9,-10.2); scene.add(photo2);
+  const frame3 = box(1.05,.85,.06,0x9a7350); frame3.position.set(6.3,2.9,-10.25); scene.add(frame3);
+}
+
+/* ============================================================
+   小游戏一：双人钓鱼（动森式）
+============================================================ */
+const FISH_TYPES = [
+  { e:'🐟', n:'三文鱼', w:34 },
+  { e:'🐠', n:'彩虹鳟', w:22 },
+  { e:'🦐', n:'小甜虾', w:18 },
+  { e:'⭐', n:'小海星', w:12 },
+  { e:'🐡', n:'河豚（好圆）', w:8 },
+  { e:'💗', n:'心形贝壳！', w:6, bonus:true },
+];
+function pickFish() {
+  let total = 0; for (const f of FISH_TYPES) total += f.w;
+  let r = Math.random()*total;
+  for (const f of FISH_TYPES) { r -= f.w; if (r<=0) return f; }
+  return FISH_TYPES[0];
+}
+function startFishing(goal, onComplete) {
+  const fishers = {};   // pid -> state
+  let caught = 0;
+  const lineMat = new THREE.LineBasicMaterial({ color:0xeeeeee });
+
+  function hudUpdate() {
+    setMinigameHUD(`🎣 双人钓鱼 · 走到发光钓点按下自己的互动键抛竿<div class="big">已钓到 ${caught} / ${goal}</div>看到 ❗ 立刻再按一次！`);
+  }
+  hudUpdate();
+
+  function getChar(pid){ return pid==='p2' ? game.tammy : game.allen; }
+
+  function fishAction(pid) {
+    const c = getChar(pid);
+    let st = fishers[pid];
+    if (!st || st.state==='idle') {
+      // 抛竿
+      const bx = c.position.x + Math.sin(c.rotation.y)*0 - 0;
+      const bobber = sph(.12, 0xff5a5a);
+      const tip = sph(.07, 0xffffff); bobber.add(tip); tip.position.y=.12;
+      bobber.position.set(c.position.x + (Math.random()*1.2-.6), .15, -10.5 - Math.random()*1.5);
+      scene.add(bobber);
+      const lineGeo = new THREE.BufferGeometry();
+      const line = new THREE.Line(lineGeo, lineMat);
+      scene.add(line);
+      st = fishers[pid] = { state:'waiting', wait: 1.5+Math.random()*3, bobber, line, biteT:0 };
+      SFX.splash();
+      c.rotation.y = Math.PI; // 面向海
+      return;
+    }
+    if (st.state==='waiting') {
+      // 太早收竿
+      cleanupFisher(pid);
+      floatText('还没咬钩呢…', 'info');
+      return;
+    }
+    if (st.state==='bite') {
+      // 成功！
+      const fish = pickFish();
+      caught++; game.stats.fish++;
+      SFX.catch();
+      emote(c, fish.e);
+      floatText(fish.e+' 钓到了 '+fish.n+'！', 'good');
+      if (fish.bonus) {
+        addAffection(2);
+        setTimeout(()=>{ emote(pid==='p2'?game.allen:game.tammy, '😍'); }, 400);
+      }
+      cleanupFisher(pid);
+      hudUpdate();
+      if (caught >= goal) finish();
+      return;
+    }
+  }
+  function cleanupFisher(pid) {
+    const st = fishers[pid];
+    if (st) {
+      if (st.bobber) scene.remove(st.bobber);
+      if (st.line) scene.remove(st.line);
+    }
+    fishers[pid] = { state:'idle' };
+  }
+  function finish() {
+    game.animated.splice(game.animated.indexOf(updateFn),1);
+    for (const pid in fishers) cleanupFisher(pid);
+    setMinigameHUD(null);
+    game.interactables = game.interactables.filter(it => !it.isFishSpot);
+    for (const it of fishSpots) if (it.marker) scene.remove(it.marker);
+    onComplete();
+  }
+  const updateFn = (t,dt) => {
+    for (const pid of ['p1','p2']) {
+      const st = fishers[pid];
+      if (!st || st.state==='idle') continue;
+      const c = getChar(pid);
+      // 鱼线
+      if (st.line && st.bobber) {
+        st.line.geometry.setFromPoints([
+          new THREE.Vector3(c.position.x+.35, c.position.y+1.2, c.position.z-.2),
+          st.bobber.position,
+        ]);
+      }
+      if (st.state==='waiting') {
+        st.bobber.position.y = .15 + Math.sin(t*3)*.05;
+        st.wait -= dt;
+        if (st.wait <= 0) {
+          st.state='bite'; st.biteT=.95;
+          SFX.bite();
+          emote(c, '❗', .9);
+          st.bobber.position.y = -.1;
+        }
+      } else if (st.state==='bite') {
+        st.bobber.position.y = -.1 + Math.sin(t*20)*.06;
+        st.biteT -= dt;
+        if (st.biteT <= 0) {
+          SFX.miss();
+          emote(c, '💧');
+          floatText('鱼溜走了…', 'info');
+          cleanupFisher(pid);
+        }
+      }
+    }
+  };
+  game.animated.push(updateFn);
+
+  // 两个钓点（都可用，按各自按键）
+  const fishSpots = [];
+  for (const fx of [-3, 3]) {
+    const it = addInteract(fx, -6.2, '钓鱼', (pid)=>{ fishAction(pid); return false; },
+      { radius:2.4, once:false, markerColor:0x8fd0ff });
+    it.isFishSpot = true;
+    fishSpots.push(it);
+  }
+}
+
+/* ============================================================
+   小游戏二：双人抓萤火虫
+============================================================ */
+function startFireflies(goal, jarLight, onComplete) {
+  const flies = [];
+  let caught = 0;
+  const flyGroup = new THREE.Group(); scene.add(flyGroup);
+
+  for (let i=0;i<goal+6;i++) {
+    const cv = document.createElement('canvas'); cv.width=cv.height=64;
+    const cx = cv.getContext('2d');
+    const grad = cx.createRadialGradient(32,32,2,32,32,30);
+    grad.addColorStop(0,'rgba(230,255,160,1)');
+    grad.addColorStop(.4,'rgba(190,255,120,.6)');
+    grad.addColorStop(1,'rgba(160,255,100,0)');
+    cx.fillStyle=grad; cx.fillRect(0,0,64,64);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map:new THREE.CanvasTexture(cv), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+    sp.scale.set(.55,.55,1);
+    sp.position.set(Math.random()*26-13, .8+Math.random()*1.6, Math.random()*20-11);
+    flyGroup.add(sp);
+    flies.push({ sp, ph:Math.random()*10, alive:true,
+      vx:(Math.random()-.5)*.8, vz:(Math.random()-.5)*.8 });
+  }
+
+  function hudUpdate() {
+    setMinigameHUD(`✨ 双人捉萤火虫 · 靠近发光的小家伙按下自己的互动键<div class="big">玻璃罐里已有 ${caught} / ${goal} 只</div>它们会害羞地躲开哦，两个人包抄效果更好！`);
+  }
+  hudUpdate();
+
+  function catchTry(pid) {
+    const c = pid==='p2' ? game.tammy : game.allen;
+    let best=1e9, bf=null;
+    for (const f of flies) {
+      if (!f.alive) continue;
+      const d = c.position.distanceTo(f.sp.position);
+      if (d < 1.5 && d < best) { best=d; bf=f; }
+    }
+    if (bf) {
+      bf.alive=false;
+      flyGroup.remove(bf.sp);
+      caught++; game.stats.fireflies++;
+      SFX.spark();
+      emote(c, '✨');
+      floatText('✨ 捉到一只萤火虫！', 'good');
+      if (jarLight) jarLight.intensity = caught*1.2;
+      hudUpdate();
+      if (caught >= goal) finish();
+    } else {
+      emote(c, '💨', .8);
+    }
+  }
+  function finish() {
+    game.animated.splice(game.animated.indexOf(updateFn),1);
+    setMinigameHUD(null);
+    game.interactables = game.interactables.filter(it => !it.isFly);
+    onComplete(flyGroup, flies);
+  }
+  const updateFn = (t,dt) => {
+    for (const f of flies) {
+      if (!f.alive) continue;
+      // 漫游
+      f.vx += Math.sin(t*1.1+f.ph)*.4*dt;
+      f.vz += Math.cos(t*.9+f.ph*1.3)*.4*dt;
+      // 害羞：被靠近会躲
+      for (const p of activePlayers()) {
+        const dx = f.sp.position.x - p.char.position.x;
+        const dz = f.sp.position.z - p.char.position.z;
+        const d = Math.hypot(dx,dz);
+        if (d < 2.2 && d > .01) {
+          f.vx += dx/d * dt * 2.2;
+          f.vz += dz/d * dt * 2.2;
+        }
+      }
+      const spd = Math.hypot(f.vx,f.vz);
+      if (spd > 1.6) { f.vx = f.vx/spd*1.6; f.vz = f.vz/spd*1.6; }
+      f.sp.position.x += f.vx*dt;
+      f.sp.position.z += f.vz*dt;
+      f.sp.position.y = 1 + Math.sin(t*2+f.ph)*.5;
+      // 场地边界反弹
+      if (f.sp.position.x < -15 || f.sp.position.x > 15) f.vx *= -1;
+      if (f.sp.position.z < -13 || f.sp.position.z > 11) f.vz *= -1;
+      // 闪烁
+      f.sp.material.opacity = .55 + Math.sin(t*4+f.ph*3)*.45;
+    }
+  };
+  game.animated.push(updateFn);
+
+  // 全场互动（任意位置按键=尝试捕捉）
+  const it = { pos:new THREE.Vector3(0,0,0), radius:1e4, label:'挥网捕捉', once:false, used:false,
+    who:'any', hidden:true, onUse:(pid)=>{ catchTry(pid); return false; } };
+  it.isFly = true;
+  game.interactables.push(it);
+  // 隐藏 tip 但保留按键响应：hidden 只影响提示——interact 查找也过滤 hidden，所以单独处理：
+  // 改成直接监听：
+  const keyFn = (e) => {
+    if (game.inDialogue || !game.playing) return;
+    if (e.code==='KeyE' || e.code==='Space') catchTry(game.mode==='dual'?'p1':'p1');
+    if (e.code==='Enter') catchTry(game.mode==='dual'?'p2':'p1');
+  };
+  addEventListener('keydown', keyFn);
+  const origFinish = finish;
+  finish = () => { removeEventListener('keydown', keyFn); origFinish(); };
+}
+
+/* ============================================================
+   剧情章节
+============================================================ */
+
+/* ---------- 第一章：茶空间 · 初遇（Allen 视角） ---------- */
+async function startChapter1() {
+  buildTeaHouse();
+  const allen = spawnAllen(0,9);
+  const tammy = spawnTammy(1.5,-9.6, Math.PI);
+  const joshua = spawnJoshua(-4,6);
+  game.mode='solo'; game.soloChar=allen;
+  setControlsHint('allen');
+
+  await fade(false);
+  game.playing = true;
+  document.getElementById('hud').classList.add('show');
+  updateHearts();
+  showChapterBanner('第 一 章 · Allen 视角', '茶空间 · 初遇');
+  setObjective('先和发光的 <b>Joshua</b> 聊聊，再走近展示架旁的<b>白衬衫女孩</b>。');
+
+  addInteract(-4, 6, '与 Joshua 对话', () => {
+    say([
+      { s:'joshua', t:'Allen，又是忙碌的一天吧。我是Joshua——你可以叫我上帝，也可以叫我……爱情观察员。' },
+      { s:'joshua', t:'你一直觉得，爱情不是寻找一个完美的人，而是找到一个让自己愿意慢下来的人。' },
+      { s:'allen', t:'（推了推眼镜）工作太忙了。我做过传播模型：心动概率 = 相遇频率 × 停留时长。我的停留时长……趋近于零。' },
+      { s:'joshua', t:'理科生的浪漫毛病得治。看到展示架前那个穿白衬衫的女孩了吗？她盯着那只青瓷杯看了十分钟了。' },
+      { s:'joshua', t:'去吧。有些相遇，慢一点，刚好。' },
+    ], () => {
+      setObjective('走近展示架前的<b>塔米</b>，和她说话。<br>⚠ 注意：说话是要走心的。');
+      tammyMeet.marker.visible = true;
+    });
+  });
+
+  const tammyMeet = addInteract(1.5, -9, '和白衬衫女孩说话', () => {
+    tammy.rotation.y = 0;
+    say([
+      { s:'narrator', t:'她穿着一件简单的白衬衫，正认真研究着一只青瓷茶杯。阳光落在杯沿上，也落在她的侧脸上。' },
+      { s:'tammy', t:'（她抬起头，眼睛亮亮的）为什么这只杯子摸起来这么温润？' },
+      { s:'narrator', t:'Allen心跳漏了一拍。别人关心多少钱，她关心为什么。你要怎么回答？', choices:[
+        { t:'「因为它经过了一千三百度的火，才学会温柔。」', love:3, lines:[
+          { s:'tammy', t:'（她愣了一下，然后笑出声）这是我听过关于瓷器最浪漫的解释。' },
+          { s:'allen', t:'其实严格来说是釉面二氧化硅在高温下形成的玻璃相……啊抱歉，职业病。我叫Allen。' },
+          { s:'tammy', t:'（她笑得更开心了）前半句是诗人，后半句是理科生。我叫塔米。我喜欢花艺、手作，还有安静地喝一杯茶。' },
+        ]},
+        { t:'「你是第一个问『为什么』而不是问价格的人。」', love:2, lines:[
+          { s:'tammy', t:'价格标签会告诉我数字，但摸起来的感觉，只有它自己知道呀。' },
+          { s:'allen', t:'我叫Allen。你说话的方式很特别。' },
+          { s:'tammy', t:'我叫塔米。特别吗？我只是……习惯慢慢看东西而已。' },
+        ]},
+        { t:'「这个嘛，标价 $45，最近还打八折。」', love:-2, lines:[
+          { s:'tammy', t:'……我没有问价格呀。（她轻轻把杯子放回了架子，眼神暗了一点）' },
+          { s:'allen', t:'（糟糕）等等——我重新回答！它温润是因为一千三百度的窑火磨掉了它所有的棱角。就像……嗯，就像有些人天生让人安心。' },
+          { s:'tammy', t:'（她重新拿起杯子，忍住笑）好吧，看在你补救得这么努力的份上。我叫塔米。你呢，报价先生？' },
+          { s:'allen', t:'……Allen。请忘掉刚才那个报价。' },
+        ]},
+        { t:'「呃……可能是店里空调开得暖？」', love:1, lines:[
+          { s:'tammy', t:'（她眨眨眼，笑了）你这个人，好实在。' },
+          { s:'allen', t:'抱歉，我叫Allen，理科式思维。让我重新回答：因为它遇到了懂它的人。' },
+          { s:'tammy', t:'（轻轻笑）补救得不错。我叫塔米。' },
+        ]},
+      ]},
+      { s:'narrator', t:'这是他们说的第一句话。后来他们聊了很久——他喜欢设计、摄影、旅行；她喜欢花艺、手作、和一杯安静的茶。' },
+      { s:'tammy', t:'Allen，你走路一定很快吧？我看你进门的样子就知道。' },
+      { s:'allen', t:'嗯……被你看穿了。时间总是不够用。' },
+      { s:'tammy', t:'慢一点，风景就在路边。……这个周末，要不要一起去海边？听说日落很好看。' },
+      { s:'joshua', t:'（远处的Joshua轻轻微笑）渐渐地，Allen开始学会放慢脚步。' },
+    ], async () => {
+      addAffection(2);
+      await fade(true);
+      startChapter2();
+    });
+  }, { markerColor:0xff8fa3 });
+  tammyMeet.marker.visible = false;
+}
+
+/* ---------- 第二章：海边 · 约会 + 双人钓鱼（双人操作） ---------- */
+async function startChapter2() {
+  buildBeach();
+  const allen = spawnAllen(-5,10);
+  const tammy = spawnTammy(-3,10.5);
+  const joshua = spawnJoshua(-8,8);
+  game.mode='dual';
+  setControlsHint('dual');
+
+  // 沙滩上的贝壳收集（走近自动捡起）
+  const shells = [];
+  for(let i=0;i<5;i++){
+    const shell = new THREE.Group();
+    const s1=sph(.14,0xfff0e0); s1.scale.y=.4; shell.add(s1);
+    const s2=sph(.08,0xffd8c8); s2.scale.y=.35; s2.position.set(.06,.04,0); shell.add(s2);
+    shell.position.set(-14+i*7+(Math.random()*2-1), .06, 8+Math.random()*6);
+    scene.add(shell); shells.push(shell);
+    game.animated.push((t)=>{ shell.rotation.y=t*.5+i; });
+  }
+  game.animated.push(() => {
+    for (const sh of shells) {
+      if (sh.userData.got) continue;
+      for (const p of activePlayers()) {
+        if (p.char.position.distanceTo(sh.position) < .95) {
+          sh.userData.got = true;
+          sh.visible = false;
+          game.stats.shells++;
+          SFX.pickup();
+          floatText('🐚 捡到贝壳 ' + game.stats.shells + '/5', 'info');
+          if (game.stats.shells >= 5) {
+            addAffection(2);
+            emote(game.tammy, '🥰');
+            floatText('🐚 集齐五只贝壳，塔米超开心！', 'good');
+          }
+          break;
+        }
+      }
+    }
+  });
+
+  await fade(false);
+  showChapterBanner('第 二 章 · 双人协作', '海边 · 第一次约会');
+  setObjective('双人模式开启！先找 <b>Joshua</b>（发光的那位）聊聊。<br>顺便留意沙滩上的 <b>🐚 贝壳</b>……');
+
+  addInteract(-8, 8, '与 Joshua 对话', () => {
+    say([
+      { s:'joshua', t:'欢迎来到英吉利湾。今天起，塔米也有了自己的意志——P2，方向键是你的，Enter 是你的互动键。' },
+      { s:'tammy', t:'（小声）上帝先生，你是在跟谁说话呀？' },
+      { s:'joshua', t:'咳咳。总之——听说傍晚的鱼很肥。你们两个不如比比看，一起钓满五条，晚餐就有着落了。' },
+      { s:'allen', t:'钓鱼？我查过流体力学论文，鱼咬钩的最佳时机是……' },
+      { s:'tammy', t:'（拉起他的袖子就走）少算公式啦，走！比比谁钓得多！' },
+    ], () => {
+      setObjective('🎣 去岸边发光的<b>钓点</b>，两人一起钓满 <b>5</b> 条鱼！<br>抛竿后看到 <b>❗</b> 立刻再按一次互动键。');
+      startFishing(5, onFishingDone);
+    });
+  });
+
+  function onFishingDone() {
+    say([
+      { s:'tammy', t:'（提着小桶）看！收获满满！Allen你刚才钓到河豚的时候，眼镜都快掉海里了。' },
+      { s:'allen', t:'那是因为它鼓起来的体积超出了我的预期模型……好吧，是我太紧张了。' },
+      { s:'joshua', t:'鱼有了。那边的小摊可以做成炸鱼薯条。去吧，把晚餐变成约会。' },
+    ], () => {
+      setObjective('去红色小摊做<b>炸鱼薯条</b>，然后两个人一起走到<b>防波堤</b>坐下看日落。');
+      standIt.marker.visible = true;
+    });
+  }
+
+  let hasFries = false;
+  const standIt = addInteract(-13, 5.5, '做炸鱼薯条', () => {
+    hasFries = true;
+    say([
+      { s:'narrator', t:'他们第一次真正的约会，不在高级餐厅，而是在海边。刚钓上来的鱼，现炸的薯条，纸袋温热。' },
+      { s:'tammy', t:'自己钓的鱼，好像格外香。' },
+      { s:'joshua', t:'（海风里仿佛有个声音）以前你赶时间，现在你愿意为一场日落绕远二十公里。这就是变化，Allen。' },
+    ], () => {
+      setObjective('两个人<b>一起</b>走到防波堤中间的光圈，坐下看日落。<br>（两个人都要靠近才行哦）');
+      sitIt.marker.visible = true;
+    });
+  });
+  standIt.marker.visible = false;
+
+  const sitIt = addInteract(0, -6.2, '一起坐下看日落', () => {
+    if (!hasFries) { floatText('先去小摊做炸鱼薯条吧', 'info'); return false; }
+    if (!bothNear(sitIt.pos, 3.2)) { floatText('两个人都要过来才行哦', 'info'); return false; }
+    // 坐上防波堤
+    allen.position.set(-.8,0,-6.8); allen.rotation.y=Math.PI;
+    tammy.position.set(.8,0,-6.8); tammy.rotation.y=Math.PI;
+    setSitting(allen,true,1.05); setSitting(tammy,true,1.05);
+    say([
+      { s:'narrator', t:'两个人坐在防波堤上，一边吃着热热的炸鱼薯条，一边看着夕阳慢慢沉进海里。' },
+      { s:'tammy', t:'薯条要趁热吃，日落要慢慢看。这两件事，今天刚好都做到了。' },
+      { s:'allen', t:'以前我觉得看日落是低效行为。现在觉得……这大概是我做过性价比最高的一件事。' },
+      { s:'tammy', t:'（她望着海面，忽然轻声说）如果以后我们老了，也还能这样坐着看海就好了。', choices:[
+        { t:'悄悄握住她的手，什么也不说。', love:4, lines:[
+          { s:'narrator', t:'Allen没有回答。只是悄悄握住了她的手。' },
+          { s:'narrator', t:'因为他知道——有些承诺，不需要说出口。' },
+          { s:'tammy', t:'（她低头看了看两人交握的手，嘴角弯了起来，也没有说话。）' },
+        ]},
+        { t:'「好，那从今天开始练习。」', love:3, lines:[
+          { s:'tammy', t:'练习什么？' },
+          { s:'allen', t:'练习陪你坐着看海，一直练到我们老。' },
+          { s:'tammy', t:'（她笑着靠在他肩上）那你可要练很久很久哦。' },
+        ]},
+        { t:'「老了？根据精算表我们还有六十年呢，不急。」', love:-2, lines:[
+          { s:'tammy', t:'（她收回目光，把薯条袋子抱在怀里）……跟你说点心里话，你跟我讲精算表。' },
+          { s:'allen', t:'（心里警铃大作）等等，我的意思是——六十年，每一年，我都想这样陪你坐着。精算表上写的。' },
+          { s:'tammy', t:'（沉默两秒，噗嗤笑了）精算表上才没有写这个。……但这句我勉强收下。' },
+        ]},
+      ]},
+      { s:'narrator', t:'太阳一点点沉进海里，天空从橘色烧成粉紫色。海鸥的叫声很远，她的呼吸声很近。' },
+      { s:'joshua', t:'天快黑了。不过——今晚还不急着回家。跟我来，我带你们去一个地方。' },
+    ], async () => {
+      addAffection(2);
+      setSitting(allen,false,0); setSitting(tammy,false,0);
+      await fade(true);
+      startChapter3();
+    });
+  }, { radius:3.4, markerColor:0xff8fa3 });
+  sitIt.marker.visible = false;
+}
+
+/* ---------- 第三章：星夜草甸 · 抓萤火虫（双人操作） ---------- */
+async function startChapter3() {
+  const { jar, jarLight } = buildMeadowNight();
+  const allen = spawnAllen(-5,7);
+  const tammy = spawnTammy(-2,8);
+  const joshua = spawnJoshua(-6,4);
+  game.mode='dual';
+  setControlsHint('dual');
+
+  await fade(false);
+  showChapterBanner('第 三 章 · 双人协作', '星空下 · 萤火虫之夜');
+  setObjective('找 <b>Joshua</b> 聊聊，看看他把你们带到了哪里。');
+
+  addInteract(-6, 4, '与 Joshua 对话', () => {
+    say([
+      { s:'tammy', t:'哇……你看天上！在温哥华住了这么久，我都没见过这么多星星！' },
+      { s:'allen', t:'光污染指数低于2的观星点，车程要一个半小时。我查过，但一直没来——总觉得没时间。' },
+      { s:'tammy', t:'（转头看他）所以你今天，把没时间的事做了两件：看日落，和看星星。' },
+      { s:'joshua', t:'还有第三件。看到草丛里那些小光点了吗？萤火虫。那边毯子上有个玻璃罐。' },
+      { s:'joshua', t:'一起装满8只，我保证——你们会看到今晚最浪漫的一幕。' },
+    ], () => {
+      setObjective('✨ 两个人一起捉 <b>8</b> 只萤火虫放进玻璃罐！<br>它们会躲人——一个人赶、一个人堵，包抄它！');
+      startFireflies(8, jarLight, onFirefliesDone);
+    });
+  });
+
+  function onFirefliesDone(flyGroup) {
+    // 走到毯子处放飞
+    setObjective('罐子亮晶晶的！两个人一起回到<b>野餐毯</b>那里。');
+    const releaseIt = addInteract(-3, 3, '一起打开罐子', () => {
+      if (!bothNear(releaseIt.pos, 3)) { floatText('两个人一起来嘛', 'info'); return false; }
+      say([
+        { s:'narrator', t:'玻璃罐在两人手心之间发着柔柔的光，像装了一小罐星星。' },
+        { s:'tammy', t:'它们好亮呀。……可是关在罐子里，它们会不开心的吧？' },
+        { s:'allen', t:'嗯。萤火虫的光是求偶信号，罐子里的它们……找不到彼此了。' },
+        { s:'tammy', t:'那我们……', choices:[
+          { t:'「一起放了它们吧。让它们也去找自己的那一只。」', love:4, lines:[
+            { s:'narrator', t:'两个人一起拧开盖子。', fn:()=>releaseFlies() },
+            { s:'narrator', t:'一罐光缓缓升上夜空，盘旋着、闪烁着，像一场只为两个人下的星星雨。' },
+            { s:'tammy', t:'（仰着头，眼睛里全是光点）Allen，你看——它们在找自己的那一只。' },
+            { s:'allen', t:'（看着她）嗯。我找到了。' },
+            { s:'tammy', t:'（愣了一下才反应过来，脸一下子红了）……你、你这个人，理科生不许突然会说情话！' },
+          ]},
+          { t:'「先拍张照，发朋友圈定位打卡。」', love:-2, lines:[
+            { s:'tammy', t:'（她把罐子从他手里拿回去，抱在怀里）萤火虫才不是打卡道具。（背过身去）' },
+            { s:'allen', t:'（完了完了）……你说得对。手机收起来了。塔米，我们一起放了它们好不好？让它们去找自己的那一只。' },
+            { s:'narrator', t:'她回过头看了他两秒，把罐子递回他手里，两个人一起拧开了盖子。', fn:()=>releaseFlies() },
+            { s:'narrator', t:'一罐光缓缓升上夜空。她仰着头看，悄悄地把刚才的不开心也一起放走了。' },
+          ]},
+          { t:'「留一只当小夜灯？明早再放。」', love:1, lines:[
+            { s:'tammy', t:'（想了想，摇摇头）它一个人会孤单的。都放了吧。' },
+            { s:'narrator', t:'两个人一起拧开盖子。', fn:()=>releaseFlies() },
+            { s:'narrator', t:'一罐光缓缓升上夜空，像一场只为两个人下的星星雨。' },
+            { s:'tammy', t:'（小声）其实……有你在，就已经是小夜灯了。' },
+          ]},
+        ]},
+        { s:'joshua', t:'（星空下，Joshua的声音很轻）记住今晚。往后的日子不会一直这么亮——但只要愿意一起抬头，光总会有的。' },
+      ], async () => {
+        addAffection(3);
+        await fade(true);
+        startChapter4();
+      });
+    }, { radius:3, markerColor:0xd8ff9a });
+
+    function releaseFlies() {
+      jarLight.intensity = 0;
+      const pts = [];
+      for (let i=0;i<10;i++) {
+        const cv = document.createElement('canvas'); cv.width=cv.height=64;
+        const cx = cv.getContext('2d');
+        const grad = cx.createRadialGradient(32,32,2,32,32,30);
+        grad.addColorStop(0,'rgba(230,255,160,1)'); grad.addColorStop(1,'rgba(160,255,100,0)');
+        cx.fillStyle=grad; cx.fillRect(0,0,64,64);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+          map:new THREE.CanvasTexture(cv), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+        sp.scale.set(.5,.5,1);
+        sp.position.set(-3,.4,3);
+        scene.add(sp);
+        pts.push({ sp, a:Math.random()*Math.PI*2, r:.2+Math.random()*.5, vy:.6+Math.random()*.7, ph:Math.random()*8 });
+      }
+      let e=0;
+      game.animated.push((t,dt)=>{
+        e+=dt;
+        for (const p of pts) {
+          p.a += dt*(1+p.ph*.1);
+          p.r += dt*.5;
+          p.sp.position.x = -3 + Math.cos(p.a)*p.r;
+          p.sp.position.z =  3 + Math.sin(p.a)*p.r;
+          p.sp.position.y += p.vy*dt;
+          p.sp.material.opacity = Math.max(0, 1 - e/9);
+        }
+        if (e>9) { for (const p of pts) scene.remove(p.sp); return 'done'; }
+      });
+    }
+  }
+}
+
+/* ---------- 第四章：煤气镇 · 拍立得（双人） ---------- */
+async function startChapter4() {
+  const gas = buildGastown();
+  const allen = spawnAllen(-2,8);
+  const tammy = spawnTammy(0,8.5);
+  const joshua = spawnJoshua(-5,6);
+  game.mode='dual';
+  setControlsHint('dual');
+
+  await fade(false);
+  showChapterBanner('第 四 章 · 双人 · 两周后', '煤气镇 · 蒸汽钟下');
+  setObjective('两周过去，你们开始一起把温哥华逛成「我们的城市」。<br>先找 <b>Joshua</b> 聊聊。');
+
+  addInteract(-5, 6, '与 Joshua 对话', () => {
+    say([
+      { s:'joshua', t:'两周了。一起挤过下班的天车，在Robson街排过一小时的拉面，下雨天共撑过一把伞——温哥华的雨，果然是恋爱加速器。' },
+      { s:'tammy', t:'（吸了吸鼻子）煤气镇的空气里有枫糖味！还有——那个金色的钟在冒烟诶！' },
+      { s:'allen', t:'那是蒸汽钟，1977年建的，靠地下蒸汽管网驱动，每隔一刻钟喷汽鸣笛一次。……我做过功课。' },
+      { s:'tammy', t:'（眼睛亮亮的）你带拍立得了吧？我看到你口袋鼓鼓的。' },
+      { s:'allen', t:'（推眼镜）嗯。今天想给你拍……呃，给这条街拍点照片。' },
+      { s:'joshua', t:'（憋笑）「给这条街」。好了，摄影师Allen，去吧——三张照片，把今天变成可以攥在手里的东西。' },
+    ], () => startPhotoSession());
+  });
+
+  function startPhotoSession() {
+    const spots = [
+      { t:[0,-4.6],  a:[0,-1.6],  name:'蒸汽钟前', steam:true },
+      { t:[-6,-1.5], a:[-3.2,1.2], name:'枫叶树下', steam:false },
+      { t:[5.5,6],   a:[2.5,7.5], name:'老橱窗前', steam:false },
+    ];
+    let idx = 0;
+    let poseIt = null;
+
+    function setupSpot() {
+      const s = spots[idx];
+      setObjective(`📸 第 ${idx+1} / 3 张 · <b>${s.name}</b><br>塔米（P2）站进粉色光圈摆pose，Allen（P1）站进蓝色光圈按 <b>E</b> 按快门${s.steam?'<br>⏰ 要等<b>蒸汽喷出的瞬间</b>拍才完美！':''}`);
+      poseIt = addInteract(s.t[0], s.t[1], '摆个pose', () => {
+        emote(game.tammy, ['🌸','✌️','💃'][idx%3]);
+        return false;
+      }, { radius:1.7, once:false, markerColor:0xff8fa3, who:'p2' });
+
+      addInteract(s.a[0], s.a[1], '按快门', () => {
+        const s2 = spots[idx];
+        if (game.tammy.position.distanceTo(new THREE.Vector3(s2.t[0],0,s2.t[1])) > 1.8) {
+          floatText('塔米还没站到位呢～', 'info'); return false;
+        }
+        if (s2.steam && !gas.isSteaming()) {
+          floatText('等蒸汽喷出的瞬间再按快门！', 'info'); return false;
+        }
+        SFX.shutter(); flash();
+        game.stats.photos++;
+        game.tammy.rotation.y = Math.atan2(
+          game.allen.position.x - game.tammy.position.x,
+          game.allen.position.z - game.tammy.position.z);
+        emote(game.tammy, '🌸');
+        floatText('📸 '+s2.name+' · 完美！', 'good');
+        poseIt.hidden = true; poseIt.used = true; poseIt.once = true;
+        if (poseIt.marker) poseIt.marker.visible = false;
+        idx++;
+        if (idx < spots.length) setupSpot(); else photosDone();
+      }, { radius:1.9, once:true, markerColor:0x8fd0ff, who:'p1' });
+    }
+    setupSpot();
+
+    function photosDone() {
+      setObjective('三张照片到手！');
+      say([
+        { s:'narrator', t:'三张拍立得在暮色里慢慢显影。街灯一盏一盏亮起来，把红砖墙染成蜂蜜的颜色。' },
+        { s:'tammy', t:'给我看看给我看看！……哇，蒸汽那张，我头发全被风吹起来了啦！重拍！' },
+        { s:'allen', t:'不重拍。这张最好看。' },
+        { s:'tammy', t:'（凑近他）哦？说说看，为什么呀？', choices:[
+          { t:'「因为照片会模糊，但按快门那一刻的心动不会。」', love:3, lines:[
+            { s:'tammy', t:'（耳朵红了，一把抢过照片）……哼，油嘴滑舌。这张、这张归我保管！' },
+            { s:'allen', t:'三张都归你。反正拍照的人，把最好的那张记在脑子里了。' },
+          ]},
+          { t:'「构图黄金分割，光圈f/2.8，参数完美，没有重拍的必要。」', love:1, lines:[
+            { s:'tammy', t:'（扶额）我问的又不是参数呀，笨蛋摄影师。' },
+            { s:'allen', t:'……好吧。翻译一下：参数完美的意思是，镜头里的人完美。' },
+            { s:'tammy', t:'（噗嗤）这个翻译版本，勉强通过。' },
+          ]},
+          { t:'「重拍要再等十五分钟蒸汽，时间成本太高了。」', love:-2, lines:[
+            { s:'tammy', t:'（把照片塞回他怀里）时间成本……那你干脆跟你的时间成本谈恋爱好啦。（扭头就走）' },
+            { s:'allen', t:'（两步追上去，把照片举到她面前）等等！你看这张照片——蒸汽、街灯、还有你。十五分钟换这一张，是我这辈子回报率最高的等待。' },
+            { s:'tammy', t:'（停下脚步，忍了三秒没忍住笑）……理科生道歉都带财报的吗。算你过关。' },
+          ]},
+        ]},
+        { s:'joshua', t:'（路灯下的光轻轻晃）照片是时间的琥珀。多攒一点吧——周末，格兰维尔岛见。听说你们要做一顿大餐？' },
+      ], async () => {
+        addAffection(2);
+        await fade(true);
+        startChapter5();
+      });
+    }
+  }
+}
+
+/* ---------- 第五章：格兰维尔岛 · 市场采购（双人） ---------- */
+async function startChapter5() {
+  buildGranville();
+  const allen = spawnAllen(-2,7);
+  const tammy = spawnTammy(0,7.5);
+  const joshua = spawnJoshua(-5,5);
+  game.mode='dual';
+  setControlsHint('dual');
+
+  await fade(false);
+  showChapterBanner('第 五 章 · 双人 · 周六清晨', '格兰维尔岛 · 公共市场');
+  setObjective('周六的市场热闹极了。先找 <b>Joshua</b> 拿今晚的菜单。');
+
+  const list = [
+    { e:'🐟', n:'三文鱼',  x:-10, z:-6, who:'p1', got:false },
+    { e:'🥖', n:'法棍',    x:-10, z:4,  who:'p1', got:false },
+    { e:'🧀', n:'奶酪',    x:0,   z:-7, who:'p1', got:false },
+    { e:'🍓', n:'草莓',    x:10,  z:-6, who:'p2', got:false },
+    { e:'🌻', n:'向日葵',  x:10,  z:4,  who:'p2', got:false },
+    { e:'🍁', n:'枫糖浆',  x:0,   z:7,  who:'p2', got:false },
+  ];
+  function listHUD() {
+    const p1 = list.filter(i=>i.who==='p1').map(i=>(i.got?'✅':'⬜')+i.e+i.n).join('　');
+    const p2 = list.filter(i=>i.who==='p2').map(i=>(i.got?'✅':'⬜')+i.e+i.n).join('　');
+    setMinigameHUD(`🛒 双人分头采购！<div class="big">P1 Allen：${p1}<br>P2 塔米：${p2}</div>`);
+  }
+
+  addInteract(-5, 5, '与 Joshua 对话', () => {
+    say([
+      { s:'joshua', t:'今晚的菜单：枫糖香煎三文鱼，配烤法棍和草莓沙拉。地道的温哥华味道。' },
+      { s:'tammy', t:'哇，还要买花！餐桌上没有花，等于汤里没有盐。' },
+      { s:'allen', t:'（掏出手机）我做了张最优采购路径图，按图走可以节省七分钟——' },
+      { s:'tammy', t:'（把他手机按下去）不要路径图！逛市场的乐趣就在于瞎逛呀。这样，我们分头买，看谁先买完！' },
+      { s:'joshua', t:'比赛开始——Allen负责 🐟三文鱼、🥖法棍、🧀奶酪；塔米负责 🍓草莓、🌻向日葵、🍁枫糖浆。开逛！' },
+    ], () => {
+      setObjective('🛒 分头行动！各自去自己颜色的光圈摊位采购。<br>蓝圈=Allen（E），粉圈=塔米（Enter）');
+      listHUD();
+      for (const item of list) {
+        addInteract(item.x, item.z, '买'+item.e+item.n, () => {
+          item.got = true;
+          game.stats.groceries++;
+          SFX.pickup();
+          floatText(item.e+' 买到'+item.n+'啦！', 'good');
+          listHUD();
+          if (list.every(i=>i.got)) allDone();
+        }, { radius:2, once:true, markerColor: item.who==='p1' ? 0x8fd0ff : 0xff8fa3, who:item.who });
+      }
+    });
+  });
+
+  function gullSteal(onLanded) {
+    const gull = new THREE.Group();
+    const b=sph(.18,0xffffff); gull.add(b);
+    const w1=box(.55,.03,.18,0xf0f0f0); w1.position.x=-.32; gull.add(w1);
+    const w2=w1.clone(); w2.position.x=.32; gull.add(w2);
+    const beak=new THREE.Mesh(new THREE.ConeGeometry(.05,.2,6),M(0xe8a03a));
+    beak.rotation.z=-Math.PI/2; beak.position.set(.24,0,0); gull.add(beak);
+    scene.add(gull);
+    const start = new THREE.Vector3(-14,8,-6);
+    gull.position.copy(start);
+    let e=0, grabbed=false;
+    const bread = box(.55,.14,.14,0xd8a05a);
+    game.animated.push((t,dt)=>{
+      e+=dt;
+      w1.rotation.z = Math.sin(t*10)*.5;
+      w2.rotation.z = -Math.sin(t*10)*.5;
+      const tgt = game.allen.position.clone().add(new THREE.Vector3(0,1.3,0));
+      if (e<1.2) gull.position.lerpVectors(start, tgt, e/1.2);
+      else {
+        if (!grabbed) {
+          grabbed=true;
+          gull.add(bread); bread.position.set(0,-.18,0);
+          SFX.miss();
+          emote(game.allen,'💢'); emote(game.tammy,'😂');
+          if (onLanded) onLanded();
+        }
+        gull.position.x += dt*7; gull.position.y += dt*2.6;
+        if (e>4.5) { scene.remove(gull); return 'done'; }
+      }
+    });
+  }
+
+  function allDone() {
+    setMinigameHUD(null);
+    say([
+      { s:'narrator', t:'两只购物袋在长椅上碰头。战果丰盛——就在这时，一道白影俯冲下来！', fn:()=>gullSteal() },
+      { s:'allen', t:'（抱着袋子原地转了两圈）我的法棍！！那只海鸥叼走了我的法棍！！' },
+      { s:'tammy', t:'（笑得直不起腰）哈哈哈哈它盯你半天了！我还以为它喜欢你！' },
+      { s:'allen', t:'（望着远去的海鸥）……温哥华的海鸥，犯罪成本为零。' },
+      { s:'narrator', t:'面包房的老板笑着又递来一根：「送你们的。它每周都来打劫，你们不是第一对。」' },
+      { s:'tammy', t:'（接过法棍，掰了一小块）诶你听——那边有小提琴的声音！' },
+    ], () => {
+      setObjective('🎻 循着琴声，两个人<b>一起</b>去街头艺人那里听一曲。');
+      buskIt.marker.visible = true;
+    });
+  }
+
+  const buskIt = addInteract(5.5, 3, '听小提琴', () => {
+    if (!bothNear(buskIt.pos, 3)) { floatText('两个人一起来听嘛', 'info'); return false; }
+    say([
+      { s:'narrator', t:'艺人拉的是一首很老的歌。琴声混着海风、烤面包香和渡轮的汽笛，慢悠悠地飘。' },
+      { s:'narrator', t:'塔米跟着旋律轻轻晃。Allen往琴盒里放了几枚硬币，然后——', choices:[
+        { t:'牵起塔米的手：「赏个脸，跳支舞？」', love:3, lines:[
+          { s:'tammy', t:'（愣了半秒，把购物袋往地上一放）在大街上哦？……好呀！', fn:()=>coupleDance(5.5,2.2) },
+          { s:'narrator', t:'两个人踩着不成调的舞步转圈，海鸥在头顶起哄，艺人笑着把曲子拉快了半拍。' },
+          { s:'tammy', t:'（转得微微喘气）Allen，你跳舞真的好烂。' },
+          { s:'allen', t:'嗯。所以要练到我们老，跟看海一起排进日程表。' },
+        ]},
+        { t:'跟着节拍轻轻拍手。', love:1, lines:[
+          { s:'narrator', t:'一曲终了，塔米鼓掌鼓得最响。艺人朝他们脱帽致意。' },
+          { s:'tammy', t:'（小声）其实……刚才我有一点点希望你请我跳舞。就一点点哦。' },
+          { s:'allen', t:'（记在心里的小本子上）下次。下次一定。' },
+        ]},
+        { t:'小声说：「这琴有点跑调啊。」', love:-2, lines:[
+          { s:'tammy', t:'（瞪他）嘘——！（把他拉远两步）人家拉得多投入呀，跑调怎么了！' },
+          { s:'allen', t:'……你说得对。而且仔细听，跑调的地方好像也挺可爱的。像生活，不完美但是热闹。' },
+          { s:'tammy', t:'（表情缓和下来）……这句总结可以。罚你往琴盒里再加五块钱。' },
+        ]},
+      ]},
+      { s:'joshua', t:'（琴声里，声音很轻）柴米油盐加一首街头的歌，这就是生活本来的样子。明天——去斯坦利公园吧，我租好了两辆自行车。' },
+    ], async () => {
+      addAffection(2);
+      await fade(true);
+      startChapter6();
+    });
+  }, { radius:3, markerColor:0xffd76b });
+  buskIt.marker.visible = false;
+
+  function coupleDance(cx, cz, dur=5.5) {
+    let e=0, note=0;
+    game.animated.push((t,dt)=>{
+      e+=dt; note-=dt;
+      const a=e*2.4;
+      game.allen.position.set(cx+Math.cos(a)*.9, 0, cz+Math.sin(a)*.9);
+      game.tammy.position.set(cx-Math.cos(a)*.9, 0, cz-Math.sin(a)*.9);
+      game.allen.rotation.y = Math.atan2(game.tammy.position.x-game.allen.position.x, game.tammy.position.z-game.allen.position.z);
+      game.tammy.rotation.y = Math.atan2(game.allen.position.x-game.tammy.position.x, game.allen.position.z-game.tammy.position.z);
+      if (note<=0) { note=.9; emote(Math.random()<.5?game.allen:game.tammy,'🎵',1.2); }
+      if (e>dur) return 'done';
+    });
+  }
+}
+
+/* ---------- 第六章：斯坦利公园 · 海堤骑行（双人） ---------- */
+async function startChapter6() {
+  buildStanleyPark();
+  const allen = spawnAllen(-28,-1);
+  const tammy = spawnTammy(-26.5,-2.5);
+  const joshua = spawnJoshua(-27,3);
+  game.mode='dual';
+  setControlsHint('dual');
+
+  await fade(false);
+  showChapterBanner('第 六 章 · 双人 · 周日黄昏', '斯坦利公园 · 海堤骑行');
+  setObjective('海堤步道全长9公里，是温哥华最浪漫的一条路。<br>先找 <b>Joshua</b> 取自行车。');
+
+  addInteract(-27, 3, '与 Joshua 对话', () => {
+    say([
+      { s:'joshua', t:'两辆自行车，粉色那辆带花篮的是塔米的。沿着海堤往东骑，terminus是图腾柱。' },
+      { s:'allen', t:'海堤逆时针单行，全长8.8公里，平均骑行时间——' },
+      { s:'tammy', t:'（已经骑上车了）比赛开始才是重点呀！输的人请吃 gelato！', fn:()=>{ giveBike(game.tammy,0xff8fa3,true); } },
+      { s:'allen', t:'诶等等，规则还没定——！', fn:()=>{ giveBike(game.allen,0x3b7fe0); } },
+      { s:'joshua', t:'路上会有秋天落下的 🍁枫叶，一起收集8片吧——塔米说想做一枚枫叶书签。到图腾柱汇合！' },
+    ], () => {
+      setObjective('🚲 沿海堤向<b>东</b>骑！一起捡 <b>8</b> 片枫叶，然后在<b>图腾柱</b>汇合。');
+      startLeafRide();
+    });
+  });
+
+  let leafCount = 0;
+  function startLeafRide() {
+    const leaves = [];
+    for (let i=0;i<10;i++) {
+      const sp = emojiSprite('🍁', .8);
+      sp.position.set(-23+i*4.7, .7, -2+(Math.random()*2.4-1.2));
+      scene.add(sp);
+      leaves.push(sp);
+      game.animated.push((t)=>{ if(sp.visible){ sp.position.y=.7+Math.sin(t*2.5+i)*.15; } });
+    }
+    setMinigameHUD(`🍁 海堤骑行<div class="big">枫叶 ${leafCount} / 8</div>骑到东边的图腾柱汇合`);
+    game.animated.push(() => {
+      for (const sp of leaves) {
+        if (!sp.visible) continue;
+        for (const p of activePlayers()) {
+          if (p.char.position.distanceTo(sp.position) < 1.25) {
+            sp.visible = false;
+            leafCount++; game.stats.leaves++;
+            SFX.pickup();
+            floatText('🍁 '+leafCount+' / 8', 'good');
+            setMinigameHUD(`🍁 海堤骑行<div class="big">枫叶 ${Math.min(leafCount,8)} / 8</div>骑到东边的图腾柱汇合`);
+            break;
+          }
+        }
+      }
+    });
+    totemIt.marker.visible = true;
+  }
+
+  const totemIt = addInteract(26, 3, '在图腾柱下汇合', () => {
+    if (leafCount < 8) { floatText('再捡几片枫叶吧 🍁 '+leafCount+'/8', 'info'); return false; }
+    if (!bothNear(totemIt.pos, 3.4)) { floatText('等等另一个人呀', 'info'); return false; }
+    removeBike(allen); removeBike(tammy);
+    setMinigameHUD(null);
+    say([
+      { s:'narrator', t:'夕阳下，图腾柱高高地立着——雷鸟、熊、鲸，原住民把祖先的故事一层层刻进木头里。' },
+      { s:'tammy', t:'（仰着头）每根柱子都是一个家族的故事诶。刻在木头上，就能传好几百年。' },
+      { s:'allen', t:'嗯。比硬盘可靠多了。硬盘平均寿命只有五年。' },
+      { s:'tammy', t:'（笑着捶他一下）会不会聊天呀！……不过，要是我们的故事也能刻在什么上面，就好了。' },
+      { s:'allen', t:'（看着她，很轻地说）在刻了。从茶空间那天就开始刻了。' },
+      { s:'tammy', t:'（愣住，然后别过脸去看图腾柱）……哼，今天的Allen有点太会说话了，可疑。' },
+    ], () => {
+      setObjective('太阳快落山了。两个人一起去<b>面海的长椅</b>坐一会儿吧。');
+      benchIt.marker.visible = true;
+    });
+  }, { radius:3.6, markerColor:0xffd76b });
+  totemIt.marker.visible = false;
+
+  const benchIt = addInteract(26, -2.2, '一起坐下看海', () => {
+    if (!bothNear(benchIt.pos, 3.2)) { floatText('要两个人一起哦', 'info'); return false; }
+    allen.position.set(25.4,0,-2.55); allen.rotation.y=Math.PI;
+    tammy.position.set(26.6,0,-2.55); tammy.rotation.y=Math.PI;
+    setSitting(allen,true,.62); setSitting(tammy,true,.62);
+    say([
+      { s:'narrator', t:'夕阳把海面烧成金红色。远处，狮门大桥的剪影横跨海湾，桥灯一颗一颗亮起来，像一串项链。' },
+      { s:'tammy', t:'我小时候第一次来斯坦利公园，就偷偷许愿——要是以后能和喜欢的人一起骑完这条海堤，就好了。' },
+      { s:'tammy', t:'（把头靠在他肩上）今天，愿望用掉了。' },
+      { s:'narrator', t:'Allen看着她被夕阳染成金色的侧脸。那句在心里排练了两个星期的话，终于到了嘴边——', choices:[
+        { t:'「塔米，我爱你。这句话我练习了很多遍，还是会紧张。」', love:4, lines:[
+          { s:'tammy', t:'（睫毛颤了一下，慢慢抬起头）……练习什么呀，笨蛋。' },
+          { s:'tammy', t:'这句话，我等很久了。——我也爱你。' },
+          { s:'narrator', t:'海浪拍在堤石上，碎成很轻很轻的声音。这一刻没有照片，但两个人都知道，它会比照片保存得更久。' },
+        ]},
+        { t:'「和你在一起的每一天，开心值都在历史峰值。……我是说，我爱你。」', love:3, lines:[
+          { s:'tammy', t:'（笑出声，眼睛却有点湿）前半句是理科生，后半句才是Allen。' },
+          { s:'tammy', t:'理科生的情话，我收下了。——我也爱你。' },
+        ]},
+        { t:'「关于爱的定义，我觉得样本量还不够，需要继续观察。」', love:-3, lines:[
+          { s:'narrator', t:'塔米沉默了几秒，站起身，慢慢朝海堤走了两步。风把她的头发吹得很乱。' },
+          { s:'allen', t:'（心脏骤停半拍，追上去抓住她的手）样本量够了！早就够了——从茶空间你问「为什么」的那一秒就够了！' },
+          { s:'allen', t:'我爱你，塔米。这个结论不需要更多数据了。' },
+          { s:'tammy', t:'（背对着他，肩膀轻轻抖——是在偷笑）……重说一遍。刚才那句，我没录上。' },
+          { s:'narrator', t:'于是他又说了一遍。这一次，海鸥、晚霞和整座狮门大桥都听见了。' },
+        ]},
+      ]},
+      { s:'narrator', t:'就在这时——', fn:()=>{ SFX.ring(); emote(game.allen,'📱'); } },
+      { s:'allen', t:'（看了一眼屏幕，是公司）……喂？嗯。……方案全部推翻？周三就要提案？……好，我马上回去。' },
+      { s:'narrator', t:'他挂掉电话。天边最后一点金色，正好暗下去。' },
+      { s:'tammy', t:'（安静了几秒，把外套抱紧了一点）……去忙吧。没关系的。' },
+      { s:'joshua', t:'（声音很远很轻）有些话说出口需要勇气，有些「没关系」，其实是「有关系」。——接下来的一周，会有点难熬。' },
+    ], async () => {
+      addAffection(2);
+      setSitting(allen,false,0); setSitting(tammy,false,0);
+      await fade(true);
+      startChapter7();
+    });
+  }, { radius:3.2, markerColor:0xff8fa3 });
+  benchIt.marker.visible = false;
+}
+
+/* ---------- 第七章：雨夜 · 冷战（Allen 视角） ---------- */
+async function startChapter7() {
+  const { milkTea } = buildRainStreet();
+  const allen = spawnAllen(-3,8);
+  const joshua = spawnJoshua(-8,3);
+  game.mode='solo'; game.soloChar=allen;
+  setControlsHint('allen');
+
+  await fade(false);
+  showChapterBanner('第 七 章 · Allen 视角', '雨夜 · 冷战第四天');
+  setObjective('恋爱不总是甜的。先和 <b>Joshua</b> 谈谈。');
+
+  addInteract(-8, 3, '与 Joshua 对话', () => {
+    say([
+      { s:'joshua', t:'第四天了，Allen。你和塔米已经三天没有说话。' },
+      { s:'allen', t:'从斯坦利公园那通电话开始，我连着一周泡在公司。前几天她来给我送汤，我盯着屏幕头都没抬。等我回过神，她已经安静地走了。' },
+      { s:'joshua', t:'恋爱并不是一直都甜。两个人也会争吵。重要的是——每一次争执之后，有没有人愿意先靠近一步。' },
+      { s:'joshua', t:'长篇大论她未必想听。但我记得，街角那家店的热奶茶，是她最喜欢的。' },
+    ], () => {
+      setObjective('拿起那杯<b>热奶茶</b>，想好便利贴上写什么。');
+      teaIt.marker.visible = true;
+    });
+  });
+
+  let hasTea = false;
+  const teaIt = addInteract(3, -2, '拿起热奶茶', () => {
+    hasTea = true;
+    milkTea.visible = false;
+    say([
+      { s:'narrator', t:'Allen没有发长篇大论。他只是买了一杯她最喜欢的热奶茶，在雨里护着它的温度。' },
+      { s:'narrator', t:'便利贴上写什么呢？', choices:[
+        { t:'「我还是不太会哄人。但我会一直学。因为对象是你。❤️」', love:4, lines:[
+          { s:'narrator', t:'笔尖在雨夜的灯光下停了停，然后一笔一画写得很认真。' },
+        ]},
+        { t:'「对不起，是我不好。奶茶趁热喝。」', love:2, lines:[
+          { s:'narrator', t:'写完他想了想，又在最后补了一句——「因为对象是你，我会一直学着变好。❤️」' },
+        ]},
+        { t:'「别生气了，多大点事，出来吃饭。」', love:-3, angryWho:'allen', lines:[
+          { s:'joshua', t:'（一道闪电劈过夜空）Allen。撕掉。重写。' },
+          { s:'allen', t:'（看着纸条上的字，自己也觉得不对劲）……这写的什么啊。她难过的从来不是「多大点事」，是我没把她的事当回事。' },
+          { s:'narrator', t:'他撕掉纸条，重新写：「我还是不太会哄人。但我会一直学。因为对象是你。❤️」', },
+        ]},
+      ]},
+    ], () => {
+      setObjective('把奶茶轻轻放到<b>塔米的门口</b>。');
+      doorIt.marker.visible = true;
+    });
+  }, { markerColor:0xffd76b });
+  teaIt.marker.visible = false;
+
+  const doorIt = addInteract(0, -8.6, '把奶茶放在门口', () => {
+    if (!hasTea) return false;
+    milkTea.visible = true;
+    milkTea.position.set(.8,0,-10.4);
+    say([
+      { s:'narrator', t:'Allen把热奶茶轻轻放在门口，贴好便利贴，退后一步，站在雨里。' },
+      { s:'narrator', t:'雨声淅淅沥沥。门内，暖黄色的灯亮着。' },
+      { s:'joshua', t:'接下来的事，就不归你了，Allen。——门的另一边，也有一个人熬了三天。' },
+    ], async () => {
+      await fade(true);
+      startChapter8();
+    });
+  }, { radius:2.4, markerColor:0xff8fa3 });
+  doorIt.marker.visible = false;
+}
+
+/* ---------- 第八章：门内 · 塔米视角 ---------- */
+async function startChapter8() {
+  const { cat } = buildApartment();
+  const tammy = spawnTammy(0,2);
+  game.mode='solo'; game.soloChar=tammy;
+  setControlsHint('tammy');
+
+  await fade(false);
+  showChapterBanner('第 八 章 · 塔米 视角', '门内 · 同一场雨');
+  setObjective('这三天，塔米也不好受。<br>看看<b>窗边</b>、看看<b>手机</b>……听听她的心里话。');
+
+  let sawPhone = false;
+
+  addInteract(-4, -6, '走到窗边', () => {
+    say([
+      { s:'tThink', t:'雨下了一整晚。这种天气，那个笨蛋肯定又忘了带伞。' },
+      { s:'tThink', t:'……我为什么要管他带没带伞。哼。' },
+      { s:'tThink', t:'那天他一直盯着电脑，我说的话一个字都没进他耳朵。我知道他忙……可是我就是，忍不住难过。' },
+    ]);
+  }, { once:true });
+
+  addInteract(4, -3.4, '看看手机', () => {
+    sawPhone = true;
+    say([
+      { s:'narrator', t:'屏幕亮着。Allen发来的消息停在三天前，最后几条是——' },
+      { s:'narrator', t:'「塔米，对不起。」「你睡了吗？」「我把那天的方案删掉重做了，做的时候一直在想你说的话。」「……晚安。」' },
+      { s:'tThink', t:'每一条我都看了。每一条我都没回。' },
+      { s:'tThink', t:'不是不想回。是不知道怎么回——如果我一秒就原谅他，他会不会觉得，我难过得很廉价？' },
+      { s:'tThink', t:'（把手机抱在怀里）可是三天了……其实我也，很想他呀。' },
+    ], () => {
+      setObjective('嗯？门外好像有动静……去<b>门口</b>看看。');
+      doorIt.marker.visible = true;
+      doorIt.hidden = false;
+    });
+  }, { once:true });
+
+  addInteract(-5.5, -5.5, '看看花架', () => {
+    say([
+      { s:'tThink', t:'这束桔梗是那天吵架前买的。花语是「永恒的爱」……买的时候还想着送他一支，摆在他那张乱糟糟的书桌上。' },
+      { s:'tThink', t:'（轻轻碰了碰花瓣）你们倒是开得挺好，一点都不懂主人的心情。' },
+    ]);
+  }, { once:true });
+
+  let petFn = null;
+  function startPetting() {
+    const r = tammy.userData.rig;
+    // 走到猫身边，面向它蹲下
+    tammy.position.set(cat.position.x, 0, cat.position.z + 1.0);
+    tammy.rotation.y = Math.PI;   // 面向猫（猫在北侧）
+    tammy.userData.acting = true;
+    let e = 0;
+    petFn = (t,dt) => {
+      e += dt;
+      const kk = Math.min(1, dt*8);
+      // 蹲下 + 前倾
+      r.legL.rotation.x = lerpAngle(r.legL.rotation.x, -1.9, kk);
+      r.legR.rotation.x = lerpAngle(r.legR.rotation.x, -1.9, kk);
+      tammy.position.y = lerpAngle(tammy.position.y, -.42, kk);
+      tammy.rotation.x = lerpAngle(tammy.rotation.x, .28, kk);
+      // 右手来回轻抚，左手扶膝
+      r.armR.rotation.x = -1.15 + Math.sin(e*5)*.32;
+      r.armL.rotation.x = lerpAngle(r.armL.rotation.x, -.55, kk);
+      // 猫咪的反应：轻轻蹭、尾巴开心、冒爱心、呼噜声
+      cat.rotation.z = Math.sin(e*3)*.07;
+      cat.position.y = Math.abs(Math.sin(e*2.2))*.03;
+      if ((e % 1.15) < dt) emote(cat, '❤️', 1.3, .9);
+      if ((e % .6) < dt) tone(140,.28,'sine',.045,110);   // 呼噜呼噜
+    };
+    game.animated.push(petFn);
+  }
+  function stopPetting() {
+    tammy.userData.acting = false;
+    tammy.rotation.x = 0; tammy.position.y = 0;
+    cat.rotation.z = 0; cat.position.y = 0;
+    const i = game.animated.indexOf(petFn);
+    if (i >= 0) game.animated.splice(i,1);
+    petFn = null;
+    emote(tammy, '🐱');
+  }
+
+  addInteract(-1.5, 3.5, '蹲下撸猫', () => {
+    startPetting();
+    say([
+      { s:'narrator', t:'塔米蹲下来，指尖顺着团子的背轻轻撸下去。呼噜声立刻大了一倍。' },
+      { s:'tammy', t:'（小声）团子～最舒服的是不是耳朵后面呀～' },
+      { s:'narrator', t:'团子舒服地眯起眼睛，尾巴摇成了小节拍器，脑袋一个劲儿往她手心里拱。' },
+      { s:'tThink', t:'……要是他一直不来找我，怎么办呀。团子，你倒是给个建议嘛。' },
+      { s:'narrator', t:'（呼噜呼噜）团子给不出建议，只是把下巴轻轻搁在了她的手背上。——好吧，这大概就是它的答案。' },
+    ], () => stopPetting());
+  }, { once:false, radius:2.2 });
+
+  const doorIt = addInteract(2, 7.6, '开门看看', () => {
+    if (!sawPhone) { floatText('先看看手机吧……', 'info'); return false; }
+    say([
+      { s:'narrator', t:'门外传来很轻的脚步声，然后是「嗒」的一声——像什么东西被轻轻放在了台阶上。' },
+      { s:'tThink', t:'是他。隔着门我都知道是他。……怎么办？', choices:[
+        { t:'深呼吸，马上开门。', love:3, lines:[
+          { s:'narrator', t:'她拉开门。雨里站着那个人，台阶上放着一杯还冒着热气的奶茶，和一张写得认认真真的便利贴。' },
+        ]},
+        { t:'等三十秒再开——让他也紧张一下下。', love:2, lines:[
+          { s:'tThink', t:'哼，让你也尝尝等待的滋味。一、二、三……（数到七就忍不住了）',},
+          { s:'narrator', t:'她假装淡定地拉开门。雨里站着那个人，台阶上放着一杯热奶茶，和一张写得认认真真的便利贴。' },
+        ]},
+        { t:'关灯，假装不在家。', love:-2, angryWho:'allen', lines:[
+          { s:'tThink', t:'（把灯关了，靠在门背后）……我在干嘛呀。' },
+          { s:'joshua', t:'（一个温和的声音仿佛落在心上）塔米。三天前你等他先走近一步。现在，他就站在这一步里，淋着雨。' },
+          { s:'tThink', t:'（鼻子一酸）……是啊。我等的不就是现在吗。' },
+          { s:'narrator', t:'她重新打开灯，拉开了门。雨里站着那个人，台阶上放着一杯还冒着热气的奶茶。' },
+        ]},
+      ]},
+      { s:'narrator', t:'便利贴上写着——「我还是不太会哄人。但我会一直学。因为对象是你。❤️」' },
+      { s:'tammy', t:'（她看着纸条，笑着流下眼泪）你这个人……哪有人道歉还画爱心的。' },
+      { s:'allen', t:'（雨里的声音有点哑）我说了，我不太会哄人。但是我会一直学。' },
+      { s:'tammy', t:'（她把奶茶抱在怀里，向他伸出另一只手）进来吧，笨蛋。外面雨那么大。' },
+      { s:'narrator', t:'她终于明白——真正成熟的爱情，不是谁从不犯错。而是每一次争执之后，都有人愿意先靠近一步。' },
+      { s:'joshua', t:'（雨声渐渐温柔）你看，只要那个人还愿意走近，下雨也是浪漫。' },
+    ], async () => {
+      addAffection(3);
+      await fade(true);
+      startChapter9();
+    });
+  }, { radius:2.4, markerColor:0xff8fa3 });
+  doorIt.marker.visible = false;
+  doorIt.hidden = true;
+}
+
+/* ---------- 场景·卡皮拉诺吊桥（雨林峡谷） ---------- */
+function buildCapilano() {
+  clearScene();
+  scene.background = new THREE.Color(0xb8d0b8);
+  scene.fog = new THREE.Fog(0xb8d0b8, 22, 55);
+  baseLight(0xd8e8d0, 0x3a4a38, 0xe8f0d8, [8,18,6], 1.3);
+
+  game.worldBounds = { minX:-9, maxX:9, minZ:-21, maxZ:11 };
+
+  // 两侧崖顶平台 + 峡谷 + 谷底河流
+  const southG = box(28,1,12,0x4a6a48); southG.position.set(0,-.5,7); scene.add(southG);
+  const northG = box(28,1,12,0x4a6a48); northG.position.set(0,-.5,-18); scene.add(northG);
+  const cliffS = box(28,7,.9,0x5a5248); cliffS.position.set(0,-3.5,.9); scene.add(cliffS);
+  const cliffN = box(28,7,.9,0x5a5248); cliffN.position.set(0,-3.5,-12.9); scene.add(cliffN);
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(40,12),
+    new THREE.MeshStandardMaterial({ color:0x4a90a8, roughness:.15, metalness:.4 }));
+  river.rotation.x=-Math.PI/2; river.position.set(0,-6.4,-6); scene.add(river);
+  game.animated.push((t)=>{ river.material.color.setHSL(.53,.4,.42+Math.sin(t*2)*.04); });
+
+  // 吊桥（14 块木板，中间下垂）
+  const bridgeSag = z => Math.sin(Math.max(0,Math.min(1,(1.2-z)/13.4))*Math.PI)*.6;
+  for (let i=0;i<15;i++){
+    const z = 1.2 - i*.93;
+    const plank = box(1.25,.07,.6,0x8a6a48);
+    plank.position.set(0, -.05-bridgeSag(z), z);
+    plank.rotation.y = (Math.random()-.5)*.04;
+    scene.add(plank);
+  }
+  // 绳索扶手
+  for (const sx of [-.68,.68]) {
+    for (let i=0;i<14;i++){
+      const z1 = 1.2-i*.93, z2 = 1.2-(i+1)*.93;
+      const y1 = .85-bridgeSag(z1), y2 = .85-bridgeSag(z2);
+      const seg = box(.05,.05,1.05,0x6a5238);
+      seg.position.set(sx,(y1+y2)/2,(z1+z2)/2);
+      seg.rotation.x = Math.atan2(y2-y1,-(z2-z1));
+      scene.add(seg);
+      const drop = box(.03,y1+.05+bridgeSag(z1)- -.05,.03,0x6a5238);
+    }
+    for (const pz of [1.2,-11.8]) {
+      const post = cyl(.09,.11,1.1,0x5a4232); post.position.set(sx,.5,pz); scene.add(post);
+    }
+  }
+
+  // 高大冷杉
+  function fir(x,z,s=1){
+    const g=new THREE.Group();
+    const trunk=cyl(.14,.2,1.6,0x6a4a32); trunk.position.y=.8; g.add(trunk);
+    for(let i=0;i<3;i++){
+      const cone=new THREE.Mesh(new THREE.ConeGeometry(1.1-i*.28,1.4,8), M(0x2f5e40));
+      cone.position.y=1.6+i*.95; g.add(cone);
+    }
+    g.position.set(x,0,z); g.scale.setScalar(s); scene.add(g);
+  }
+  fir(-6,8,1.2); fir(6,9,1.4); fir(-7,5,1); fir(7,4,.9);
+  fir(-6,-16,1.3); fir(6,-17,1.2); fir(-4,-19,1); fir(5,-20,1.4); fir(0,-19,1.1);
+
+  // 峡谷雾气
+  for(let i=0;i<6;i++){
+    const cv=document.createElement('canvas'); cv.width=cv.height=64;
+    const cx=cv.getContext('2d');
+    const grad=cx.createRadialGradient(32,32,4,32,32,30);
+    grad.addColorStop(0,'rgba(255,255,255,.5)'); grad.addColorStop(1,'rgba(255,255,255,0)');
+    cx.fillStyle=grad; cx.fillRect(0,0,64,64);
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false}));
+    sp.scale.set(6,3,1);
+    sp.position.set(Math.random()*16-8,-3-Math.random()*2,-6+Math.random()*8-4);
+    scene.add(sp);
+    const ph=i*1.3;
+    game.animated.push((t)=>{ sp.position.x += Math.sin(t*.3+ph)*.004; sp.material.opacity=.4+Math.sin(t*.5+ph)*.15; });
+  }
+  return { bridgeSag };
+}
+
+/* ---------- 场景·松鸡山（冬雪） ---------- */
+function buildGrouse() {
+  clearScene();
+  scene.background = new THREE.Color(0xdfe8f2);
+  scene.fog = new THREE.Fog(0xdfe8f2, 26, 60);
+  baseLight(0xf0f6ff, 0xb8c8d8, 0xfff8e8, [8,14,6], 1.5);
+
+  ground(0xf0f4f8, 46);
+  game.worldBounds = { minX:-13, maxX:13, minZ:-10, maxZ:10 };
+
+  // 落雪
+  const snowN = 900;
+  const spArr = new Float32Array(snowN*3);
+  for(let i=0;i<snowN;i++){ spArr[i*3]=Math.random()*36-18; spArr[i*3+1]=Math.random()*12; spArr[i*3+2]=Math.random()*26-13; }
+  const snowGeo = new THREE.BufferGeometry();
+  snowGeo.setAttribute('position', new THREE.BufferAttribute(spArr,3));
+  const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color:0xffffff, size:.12, transparent:true, opacity:.9 }));
+  scene.add(snow);
+  game.animated.push((t,dt)=>{
+    const a=snowGeo.attributes.position.array;
+    for(let i=0;i<snowN;i++){
+      a[i*3+1]-=dt*1.6;
+      a[i*3]+=Math.sin(t+i)*.15*dt;
+      if(a[i*3+1]<0)a[i*3+1]=12;
+    }
+    snowGeo.attributes.position.needsUpdate=true;
+  });
+
+  // 雪松
+  function snowPine(x,z,s=1){
+    const g=new THREE.Group();
+    const trunk=cyl(.12,.18,1.2,0x5a4232); trunk.position.y=.6; g.add(trunk);
+    for(let i=0;i<3;i++){
+      const cone=new THREE.Mesh(new THREE.ConeGeometry(1-i*.26,1.2,8), M(0x2f5040));
+      cone.position.y=1.3+i*.8; g.add(cone);
+      const cap2=new THREE.Mesh(new THREE.ConeGeometry(.92-i*.26,.5,8), M(0xf5f8fc));
+      cap2.position.y=1.75+i*.8; g.add(cap2);
+    }
+    g.position.set(x,0,z); g.scale.setScalar(s); scene.add(g);
+  }
+  snowPine(-10,-6,1.2); snowPine(10,-7,1.4); snowPine(-11,3,1); snowPine(11,5,1.1); snowPine(-4,-9,1.3); snowPine(4,-9,.9);
+
+  // 小木屋（暖窗）
+  const lodge = new THREE.Group();
+  const lw = box(5,2.6,3,0x8a6242); lw.position.y=1.3; lodge.add(lw);
+  const roofL = new THREE.Mesh(new THREE.ConeGeometry(4.2,1.8,4), M(0xf5f8fc)); roofL.position.y=3.4; roofL.rotation.y=Math.PI/4; lodge.add(roofL);
+  for(const s of [-1,1]){
+    const win=box(.9,.9,.1,0xffd98a,{emissive:0xffc76b,emissiveIntensity:1.5});
+    win.position.set(s*1.4,1.4,1.56); lodge.add(win);
+  }
+  const chim=box(.5,1.4,.5,0x6a5248); chim.position.set(1.4,3.6,0); lodge.add(chim);
+  lodge.position.set(8,0,-5); scene.add(lodge);
+  const lLight=new THREE.PointLight(0xffc76b,14,12); lLight.position.set(8,2,-3); scene.add(lLight);
+  // 烟囱白烟
+  const smoke = new THREE.Mesh(new THREE.SphereGeometry(.2,8,8), new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.5}));
+  smoke.position.set(9.4,4.5,-5); scene.add(smoke);
+  game.animated.push((t)=>{ smoke.position.y=4.5+((t*.4)%1.4); smoke.material.opacity=.5-((t*.4)%1.4)*.32; smoke.scale.setScalar(1+((t*.4)%1.4)*.8); });
+
+  // 缆车
+  const cable = box(44,.05,.05,0x3a3f4c); cable.position.set(0,8.5,-8); scene.add(cable);
+  const cabin = new THREE.Group();
+  const cb = box(1.4,1.1,1,0xd8443c); cb.position.y=-.8; cabin.add(cb);
+  const arm2 = box(.08,.5,.08,0x3a3f4c); arm2.position.y=-.25; cabin.add(arm2);
+  cabin.position.set(0,8.5,-8); scene.add(cabin);
+  game.animated.push((t)=>{ cabin.position.x = Math.sin(t*.1)*18; cabin.rotation.z = Math.sin(t*.8)*.03; });
+
+  // 远处雪山
+  for (const [mx,mh] of [[-30,14],[0,18],[30,15]]) {
+    const m2 = new THREE.Mesh(new THREE.ConeGeometry(18,mh,5), M(0xdfe8f0,{roughness:1}));
+    m2.position.set(mx, mh/2-2, -46); scene.add(m2);
+  }
+  return {};
+}
+
+/* ---------- 场景·慢一点花店 ---------- */
+function buildFlowerShop() {
+  clearScene();
+  scene.background = new THREE.Color(0xf5e0d0);
+  scene.fog = new THREE.Fog(0xf5e0d0, 20, 40);
+  scene.add(new THREE.HemisphereLight(0xfff0dd, 0x9a8070, .95));
+  const warm = new THREE.PointLight(0xffd9a8, 20, 22); warm.position.set(0,3.6,0); scene.add(warm);
+  const sunbeam = new THREE.DirectionalLight(0xffe8c8, 1.1); sunbeam.position.set(4,8,6);
+  sunbeam.castShadow=true; sunbeam.shadow.mapSize.set(1024,1024);
+  const ss=12; Object.assign(sunbeam.shadow.camera,{left:-ss,right:ss,top:ss,bottom:-ss,far:40});
+  scene.add(sunbeam);
+
+  ground(0xd8c0a0, 20);
+  game.worldBounds = { minX:-7.5, maxX:7.5, minZ:-7, maxZ:7 };
+
+  // 墙（前墙半透明防挡镜头）
+  const back = box(16,4.4,.4,0xf5e8d8); back.position.set(0,2.2,-8); scene.add(back);
+  const left = box(.4,4.4,16,0xf0e0cc); left.position.set(-8,2.2,0); scene.add(left);
+  const right = left.clone(); right.position.x=8; scene.add(right);
+  const front = box(16,4.4,.4,0xf5e8d8,{transparent:true,opacity:.12,depthWrite:false});
+  front.position.set(0,2.2,8); front.castShadow=false; scene.add(front);
+  const door = box(1.6,2.6,.22,0x7a9a6a); door.position.set(2,1.3,7.8); scene.add(door);
+  const dwin = box(1,1,.1,0xbfe3f2,{transparent:true,opacity:.6}); dwin.position.set(2,1.7,7.65); scene.add(dwin);
+
+  // 柜台 + 大花瓶
+  const counter = box(3.6,.95,1.2,0xb08968); counter.position.set(0,.47,-3); scene.add(counter);
+  const bigVase = cyl(.3,.4,.7,0xa8d8e8,16,{roughness:.2}); bigVase.position.set(0,1.3,-3); scene.add(bigVase);
+
+  // 花桶货架
+  function bucket(x,z,color){
+    const g=new THREE.Group();
+    const b=cyl(.32,.26,.5,0x8a8f98,12,{metalness:.5,roughness:.4}); b.position.y=.25; g.add(b);
+    for(let i=0;i<5;i++){
+      const stem=cyl(.015,.015,.5,0x5f8f5a); const a=i/5*Math.PI*2;
+      stem.position.set(Math.cos(a)*.12,.6,Math.sin(a)*.12); g.add(stem);
+      const f=sph(.09,color); f.position.set(Math.cos(a)*.14,.9,Math.sin(a)*.14); g.add(f);
+    }
+    g.position.set(x,0,z); scene.add(g); return g;
+  }
+  bucket(-6,-6,0xff8fa3);   // 粉玫瑰
+  bucket(-6,-2,0xfff8f0);   // 白桔梗
+  bucket(-6,2,0xffe36b);    // 小雏菊
+  bucket(6,-6,0xd88bff); bucket(6,-2,0xffb26b);
+
+  // 层架 & 挂灯串
+  const shelf1 = box(3,.08,.8,0x9a7350); shelf1.position.set(5.5,1.6,-7.4); scene.add(shelf1);
+  for(let i=0;i<4;i++){ const pot=cyl(.14,.1,.2,0xb5651d); pot.position.set(4.4+i*.75,1.75,-7.4); scene.add(pot);
+    const pl=sph(.1,0x7fae6a); pl.position.set(4.4+i*.75,1.95,-7.4); scene.add(pl); }
+  for(let i=0;i<=12;i++){
+    const bx=-6+i;
+    const by=3.4-Math.sin((i/12)*Math.PI)*.5;
+    const bulb=new THREE.Mesh(new THREE.SphereGeometry(.05,8,8), new THREE.MeshBasicMaterial({color:0xffe9b0}));
+    bulb.position.set(bx,by,-1); scene.add(bulb);
+  }
+  // 梯子 & 纸箱（开业前的忙乱）
+  const ladder=new THREE.Group();
+  for(const s of [-1,1]){ const rail=box(.06,2.2,.06,0x9a7350); rail.position.set(s*.3,1.1,0); ladder.add(rail); }
+  for(let i=0;i<4;i++){ const rung=box(.6,.06,.06,0x9a7350); rung.position.y=.35+i*.5; ladder.add(rung); }
+  ladder.position.set(-4,0,6); ladder.rotation.y=.4; scene.add(ladder);
+  box(1,.7,.8,0xc0a070).position.set(4.5,.35,5.5);
+  const box1=box(1,.7,.8,0xc0a070); box1.position.set(4.5,.35,5.5); scene.add(box1);
+  const box2=box(.8,.6,.7,0xb09060); box2.position.set(4.6,1,5.4); box2.rotation.y=.3; scene.add(box2);
+
+  // 招牌（先斜靠在墙边，任务后挂到门上）
+  const sign = new THREE.Group();
+  const board = box(2.6,.8,.12,0xfff8f0); board.position.y=0; sign.add(board);
+  const trim = box(2.7,.9,.06,0x7a9a6a); trim.position.z=-.05; sign.add(trim);
+  const fl1=sph(.09,0xff8fa3); fl1.position.set(-1.05,.25,.1); sign.add(fl1);
+  const fl2=sph(.07,0xffe36b); fl2.position.set(1.05,-.2,.1); sign.add(fl2);
+  sign.position.set(-6.5,.85,5.8); sign.rotation.z=.28; sign.rotation.y=.9;
+  scene.add(sign);
+
+  // 团子也来了（趴在柜台上）
+  const cat = new THREE.Group();
+  const catBody = sph(.26,0xe8c9a0); catBody.scale.set(1.3,.7,.9); catBody.position.y=.16; cat.add(catBody);
+  const catHead = sph(.16,0xe8c9a0); catHead.position.set(.3,.28,0); cat.add(catHead);
+  for(const s of [-1,1]){ const ear=new THREE.Mesh(new THREE.ConeGeometry(.055,.11,6),M(0xd8a878)); ear.position.set(.31,.42,s*.08); cat.add(ear); }
+  const tail = cyl(.035,.02,.45,0xe8c9a0); tail.rotation.z=.9; tail.position.set(-.35,.28,0); cat.add(tail);
+  cat.position.set(1.2,.95,-3); scene.add(cat);
+  game.animated.push((t)=>{ tail.rotation.z=.9+Math.sin(t*2)*.2; });
+
+  return { sign, bigVase, door };
+}
+
+/* ---------- 场景·女皇公园婚礼 ---------- */
+function buildWeddingGarden() {
+  clearScene();
+  scene.background = new THREE.Color(0xd8ecf5);
+  scene.fog = new THREE.Fog(0xd8ecf5, 30, 70);
+  baseLight(0xffffff, 0x88a878, 0xfff6e0, [8,16,8], 1.8);
+
+  ground(0x8fbf78, 44);
+  game.worldBounds = { minX:-11, maxX:11, minZ:-9, maxZ:10 };
+
+  // 花瓣小径
+  for(let i=0;i<26;i++){
+    const petal=new THREE.Mesh(new THREE.CircleGeometry(.12,8),
+      new THREE.MeshBasicMaterial({color:[0xffb6c1,0xfff0f4][i%2], side:THREE.DoubleSide}));
+    petal.rotation.x=-Math.PI/2;
+    petal.position.set((Math.random()-.5)*1.6, .02, 8-i*.55);
+    scene.add(petal);
+  }
+  // 花拱门
+  const arch = new THREE.Group();
+  for(const s of [-1,1]){ const pillar=cyl(.12,.14,2.6,0xfff8f0); pillar.position.set(s*1.5,1.3,0); arch.add(pillar); }
+  const arcT = new THREE.Mesh(new THREE.TorusGeometry(1.5,.12,10,24,Math.PI), M(0xfff8f0));
+  arcT.position.y=2.6; arch.add(arcT);
+  for(let i=0;i<=10;i++){
+    const a=i/10*Math.PI;
+    const f=sph(.11,[0xff8fa3,0xffe36b,0xd88bff][i%3]);
+    f.position.set(Math.cos(a)*1.5, 2.6+Math.sin(a)*1.5, .05); arch.add(f);
+  }
+  arch.position.set(0,0,-6); scene.add(arch);
+
+  // 白椅子（两列）
+  for(let r2=0;r2<4;r2++)for(const s of [-1,1]){
+    for(let cc=0;cc<2;cc++){
+      const chair=new THREE.Group();
+      const seat=box(.5,.08,.5,0xfff8f0); seat.position.y=.45; chair.add(seat);
+      const backCh=box(.5,.5,.06,0xfff8f0); backCh.position.set(0,.75,-.22); chair.add(backCh);
+      for(const lx of [-.2,.2])for(const lz of [-.2,.2]){
+        const leg=box(.05,.45,.05,0xe8e0d0); leg.position.set(lx,.22,lz); chair.add(leg);
+      }
+      chair.position.set(s*(2.2+cc*.9), 0, -3.5+r2*1.4);
+      chair.rotation.y = s*.12;
+      scene.add(chair);
+    }
+  }
+  // 花坛
+  for(const [fx,fz] of [[-8,-6],[8,-6],[-8,4],[8,4]]){
+    const bed=cyl(1.2,1.3,.4,0x9a7350,18); bed.position.set(fx,.2,fz); scene.add(bed);
+    for(let i=0;i<8;i++){
+      const a=i/8*Math.PI*2;
+      const f=sph(.11,[0xff8fa3,0xffe36b,0xd88bff,0xff7f9c][i%4]);
+      f.position.set(fx+Math.cos(a)*.7,.55,fz+Math.sin(a)*.7); scene.add(f);
+    }
+  }
+  makeTree(-9,8,1.2,0x7fae6a); makeTree(9,8,1.1,0x8fbf78); makeTree(-10,-2,1,0x7fae6a); makeTree(10,0,1,0x8fbf78);
+  // 远处温室穹顶（女皇公园 Bloedel）
+  const dome2 = new THREE.Mesh(new THREE.SphereGeometry(5,16,12,0,Math.PI*2,0,Math.PI/2),
+    new THREE.MeshStandardMaterial({ color:0xcfe8f0, metalness:.5, roughness:.25, transparent:true, opacity:.85 }));
+  dome2.position.set(-18,0,-30); scene.add(dome2);
+
+  // 宾客：小提琴艺人（老朋友）+ 两位宾客 + 戴蝴蝶结的团子
+  const busker = makeCharacter({ shirt:0x6a4a8a, pants:0x3a3230, hair:0x6a5242 });
+  busker.position.set(-4.5,0,-5); busker.rotation.y=.7; scene.add(busker); game.chars.push(busker);
+  const violin = box(.14,.34,.06,0x8a4a2a); violin.position.set(-.28,1.42,.18); violin.rotation.z=.5; busker.add(violin);
+  let noteT=0;
+  game.animated.push((t,dt)=>{
+    noteT-=dt; if(noteT<=0){ noteT=2.4; emote(busker,'🎵',1.6); }
+    busker.userData.rig.armR.rotation.x = -.5+Math.sin(t*3)*.3;
+  });
+  const guest1 = makeCharacter({ shirt:0x5a8ac0, pants:0x3a4258, hair:0x3a2a20 });
+  guest1.position.set(-3,0,-1); guest1.rotation.y=.4; scene.add(guest1); game.chars.push(guest1);
+  const guest2 = makeCharacter({ shirt:0xe8a8b8, pants:0xc9a7d8, hair:0x6a4a2a, longHair:true, skirt:true });
+  guest2.position.set(3.2,0,-.5); guest2.rotation.y=-.5; scene.add(guest2); game.chars.push(guest2);
+  const cat = new THREE.Group();
+  const catBody = sph(.26,0xe8c9a0); catBody.scale.set(1.3,.75,.9); catBody.position.y=.18; cat.add(catBody);
+  const catHead = sph(.16,0xe8c9a0); catHead.position.set(.28,.32,0); cat.add(catHead);
+  for(const s of [-1,1]){ const ear=new THREE.Mesh(new THREE.ConeGeometry(.055,.11,6),M(0xd8a878)); ear.position.set(.29,.46,s*.08); cat.add(ear); }
+  const bow = box(.16,.09,.05,0xd8443c); bow.position.set(.28,.24,.12); cat.add(bow);
+  const tailW = cyl(.035,.02,.45,0xe8c9a0); tailW.rotation.z=.9; tailW.position.set(-.32,.3,0); cat.add(tailW);
+  cat.position.set(1.8,0,-2.8); scene.add(cat);
+  game.animated.push((t)=>{ tailW.rotation.z=.9+Math.sin(t*2.2)*.22; });
+  return {};
+}
+
+/* ---------- 第九章：卡皮拉诺 · 吊桥与深谷（双人） ---------- */
+async function startChapter9() {
+  const cap = buildCapilano();
+  const allen = spawnAllen(-2,8);
+  const tammy = spawnTammy(0,8.5);
+  const joshua = spawnJoshua(-4,6);
+  game.mode='dual';
+  setControlsHint('dual');
+
+  await fade(false);
+  showChapterBanner('第 九 章 · 双人 · 和好之后', '卡皮拉诺 · 吊桥与深谷');
+  setObjective('和好后的第一次出游。雨林深处，吊桥在峡谷上轻轻晃。<br>先找 <b>Joshua</b>。');
+
+  // 桥面行走：限制在桥宽内 + 跟随桥面下垂 + 大风事件
+  let windOn=false, windT=5, crossing=false;
+  game.animated.push((t,dt)=>{
+    for (const p of activePlayers()) {
+      const c=p.char;
+      if (c.position.z < 1.2 && c.position.z > -11.8) {
+        c.position.x = Math.max(-.55, Math.min(.55, c.position.x));
+        c.userData.baseY = -.02 - cap.bridgeSag(c.position.z);
+        if (c===tammy && Math.random()<dt*.25) emote(tammy,'😨',1.2);
+        if (windOn && c.userData.speedNow > 1.2) {
+          c.position.z += dt*4;   // 被风顶回去一点
+          if (Math.random()<dt*3) { emote(c,'😱',1); camera.position.x += (Math.random()-.5)*.3; }
+        }
+      } else if (!c.userData.sitting) c.userData.baseY = 0;
+    }
+    if (crossing) {
+      windT -= dt;
+      if (windT <= 0) {
+        windOn = !windOn;
+        windT = windOn ? 1.8 : 4+Math.random()*3;
+        if (windOn) { SFX.miss(); setMinigameHUD('🌬️🌬️🌬️<div class="big">大风来了——站住别动！！</div>'); }
+        else setMinigameHUD('🌉 过桥中<div class="big">风停了，快走两步！</div>看到 🌬️ 就立刻停下');
+      }
+    }
+  });
+
+  addInteract(-4, 6, '与 Joshua 对话', () => {
+    say([
+      { s:'joshua', t:'卡皮拉诺吊桥——137米长，悬在70米高的峡谷上。1889年就挂在这儿了。' },
+      { s:'tammy', t:'（往峡谷里瞄了一眼，立刻抓住Allen的袖子）等等，70米？？下面还有河？？' },
+      { s:'allen', t:'放心，钢缆承重极限是我们体重的一千倍以上。数学上说，这桥比人行道还安全。' },
+      { s:'tammy', t:'数学上！我怕的又不是数学！' },
+      { s:'joshua', t:'（笑）风大的时候桥会晃。记住口诀：风来了就停，风停了再走。两个人一起，走到对岸去吧。' },
+    ], () => {
+      crossing = true;
+      setObjective('🌉 两个人一起过桥！<b>起风（🌬️）时立刻停下</b>，风停再走。<br>在对岸的光圈汇合。');
+      setMinigameHUD('🌉 过桥中<div class="big">扶好扶手，慢慢走</div>看到 🌬️ 就立刻停下');
+      farIt.marker.visible = true;
+    });
+  });
+
+  const farIt = addInteract(0, -15, '在对岸汇合', () => {
+    if (!bothNear(farIt.pos, 3.4)) { floatText('等等还在桥上的那位～', 'info'); return false; }
+    crossing = false; windOn = false;
+    setMinigameHUD(null);
+    say([
+      { s:'tammy', t:'（腿还有点软，抓着他的手没松开）我我我刚才是不是超勇敢！' },
+      { s:'allen', t:'嗯，比包里那袋薯片勇敢多了——它在桥中间就碎了。' },
+      { s:'tammy', t:'（捶他）会不会安慰人啊！……不过说真的，桥晃得最厉害的时候，你把我的手抓得好紧。' },
+      { s:'narrator', t:'Allen看着她。峡谷的风把雾气吹得散散的，阳光从冷杉的缝隙里漏下来。', choices:[
+        { t:'「吵架那三天我就想明白了——不管晃得多厉害，我都不会再松手。」', love:3, lines:[
+          { s:'tammy', t:'（低头看着两只还牵着的手，很小声）……嗯。我也是。' },
+          { s:'narrator', t:'吊桥在身后轻轻晃。有些桥，走过一次，就再也不怕了。' },
+        ]},
+        { t:'「握力是本能反应，人在紧张时会抓住最重要的东西。」', love:2, lines:[
+          { s:'tammy', t:'（眨眨眼）哦？最重要的东西？' },
+          { s:'allen', t:'（耳朵红了）……数据不会说谎。' },
+        ]},
+        { t:'「主要是你抓我抓得太疼，我只能反握止损。」', love:-2, lines:[
+          { s:'tammy', t:'（松开手）好呀，那下次你自己走，我坐缆车。（转身就走）' },
+          { s:'allen', t:'（一把牵回来）口误！刚才桥上我心里只有一句话——「她在我手里，谁也别想让她晃一下」。' },
+          { s:'tammy', t:'（哼了一声，手却没再抽走）……这句背了多久？' },
+          { s:'allen', t:'三天。吵架那三天。' },
+        ]},
+      ]},
+      { s:'joshua', t:'走过晃的桥，感情反而更稳了。下个月山上就落雪了——松鸡山见。' },
+    ], async () => {
+      addAffection(2);
+      await fade(true);
+      startChapter10();
+    });
+  }, { radius:3.6, markerColor:0xff8fa3 });
+  farIt.marker.visible = false;
+}
+
+/* ---------- 第十章：松鸡山 · 初雪（双人） ---------- */
+async function startChapter10() {
+  buildGrouse();
+  const allen = spawnAllen(-3,7);
+  const tammy = spawnTammy(-1,7.5);
+  const joshua = spawnJoshua(-5,4);
+  game.mode='dual';
+  setControlsHint('dual');
+
+  await fade(false);
+  showChapterBanner('第 十 章 · 双人 · 冬', '松鸡山 · 初雪');
+  setObjective('温哥华的第一场雪落在山顶上。先找 <b>Joshua</b>。');
+
+  addInteract(-5, 4, '与 Joshua 对话', () => {
+    say([
+      { s:'tammy', t:'（伸手接雪花）是今年的初雪诶！Allen，快看，缆车像挂在天上的小红灯笼！' },
+      { s:'allen', t:'海拔1250米，气温零下3度，积雪厚度约……（被塞了一团雪进领子）——！！塔米！！' },
+      { s:'tammy', t:'（跑远两步）谁让你报天气预报的！' },
+      { s:'joshua', t:'（大笑）雪已经开战了。不过先干正事——堆一个雪人吧，就堆在小木屋旁边。大、中、小三个雪球，滚起来！' },
+    ], () => {
+      setObjective('⛄ 堆雪人！按顺序去三个光圈<b>滚雪球</b>（谁去都行），<br>雪人堆在小木屋旁边。');
+      snowballStep(0);
+    });
+  });
+
+  // —— 堆雪人 ——
+  const snowmanPos = new THREE.Vector3(5.5,0,1.5);
+  const ballSpecs = [
+    { r:.62, y:.62,  spot:[-6,4],  label:'滚一个大雪球' },
+    { r:.44, y:1.6,  spot:[5,-4],  label:'滚一个中雪球' },
+    { r:.3,  y:2.28, spot:[-3,-6], label:'滚一个小雪球' },
+  ];
+  let snowman = [];
+  function snowballStep(i) {
+    if (i >= 3) return decorateStep();
+    const spec = ballSpecs[i];
+    addInteract(spec.spot[0], spec.spot[1], spec.label, (pid) => {
+      SFX.splash();
+      const who = (game.mode==='dual' && pid==='p2') ? game.tammy : game.allen;
+      emote(who, '⛄');
+      // 雪球滚向雪人位置
+      const ball = sph(spec.r, 0xffffff);
+      ball.position.set(spec.spot[0], spec.r, spec.spot[1]);
+      scene.add(ball); snowman.push(ball);
+      const from = ball.position.clone();
+      const to = new THREE.Vector3(snowmanPos.x, spec.y, snowmanPos.z);
+      let e = 0;
+      game.animated.push((t,dt) => {
+        e += dt/1.1;
+        if (e>=1) { ball.position.copy(to); floatText('⛄ 第'+(i+1)+'个雪球堆好了！','good'); SFX.ok(); snowballStep(i+1); return 'done'; }
+        ball.position.lerpVectors(from, to, e);
+        ball.position.y = Math.max(spec.r, to.y*e);
+        ball.rotation.x -= dt*6;
+      });
+    }, { radius:2.2, once:true, markerColor:0x8fd0ff });
+  }
+  function decorateStep() {
+    setObjective('雪人有了身体！去<b>小木屋</b>拿装饰——胡萝卜鼻子和围巾。');
+    addInteract(8, -2.5, '拿胡萝卜和围巾', () => {
+      SFX.pickup();
+      floatText('🥕🧣 拿到装饰啦！','info');
+      setObjective('回到<b>雪人</b>那里，给它装扮！');
+      addInteract(snowmanPos.x, snowmanPos.z+1.2, '给雪人装扮', () => {
+        // 胡萝卜 + 眼睛 + 围巾 + 树枝手
+        const carrot = new THREE.Mesh(new THREE.ConeGeometry(.06,.3,8), M(0xe8843a));
+        carrot.rotation.x = Math.PI/2; carrot.position.set(snowmanPos.x, 2.28, snowmanPos.z+.3); scene.add(carrot);
+        for (const s of [-1,1]) {
+          const eye = sph(.045, 0x2a2a2a); eye.position.set(snowmanPos.x+s*.1, 2.4, snowmanPos.z+.24); scene.add(eye);
+        }
+        const scarf = cyl(.34,.34,.12,0xd8443c,12); scarf.position.set(snowmanPos.x, 1.95, snowmanPos.z); scene.add(scarf);
+        const scarfEnd = box(.14,.4,.06,0xd8443c); scarfEnd.position.set(snowmanPos.x+.2, 1.7, snowmanPos.z+.2); scene.add(scarfEnd);
+        for (const s of [-1,1]) {
+          const arm3 = cyl(.03,.02,.7,0x6a4a32); arm3.rotation.z = s*1.2;
+          arm3.position.set(snowmanPos.x+s*.7, 1.7, snowmanPos.z); scene.add(arm3);
+        }
+        SFX.love();
+        emote(game.tammy,'🥰'); emote(game.allen,'⛄');
+        say([
+          { s:'tammy', t:'完成！它叫「团子三号」！（团子二号是上次沙滩上的沙堆猫）' },
+          { s:'allen', t:'……命名体系混乱，但意外地很可爱。合影一张，给团子本子发过去。' },
+          { s:'joshua', t:'（雪花越下越密）雪人堆完了，还记得刚才领子里那团雪吗，Allen？——复仇的时间到了。打雪仗！！' },
+        ], () => startSnowFight());
+      }, { radius:2.4, markerColor:0xffd76b });
+    }, { radius:2.6, markerColor:0xffd76b });
+  }
+
+  // —— 打雪仗 ——
+  let fight=false, throws=0;
+  const cd = { p1:0, p2:0 };
+  function startSnowFight() {
+    fight = true;
+    setObjective('☃️ 打雪仗！随时按<b>自己的互动键</b>朝对方扔雪球，扔满 6 个！');
+    setMinigameHUD('☃️ 打雪仗！<div class="big">0 / 6</div>按自己的互动键朝对方扔雪球！');
+  }
+  const fightKey = (e) => {
+    if (!fight || game.inDialogue || !game.playing) return;
+    let pid = null;
+    if (e.code==='KeyE'||e.code==='Space') pid='p1';
+    if (e.code==='Enter') pid='p2';
+    if (!pid) return;
+    const now = performance.now();
+    if (cd[pid] && now-cd[pid] < 700) return;
+    cd[pid] = now;
+    throwSnow(pid);
+  };
+  addEventListener('keydown', fightKey);
+  function throwSnow(pid) {
+    const from = pid==='p1' ? allen : tammy;
+    const to   = pid==='p1' ? tammy : allen;
+    SFX.splash();
+    const ball = sph(.13, 0xffffff); scene.add(ball);
+    const p0 = from.position.clone().add(new THREE.Vector3(0,1.6,0));
+    const p1v = to.position.clone().add(new THREE.Vector3(0,1.1,0));
+    let e = 0;
+    game.animated.push((t,dt) => {
+      e += dt/.55;
+      if (e >= 1) {
+        scene.remove(ball);
+        emote(to, '😆', 1.1);
+        SFX.pickup();
+        throws++;
+        setMinigameHUD(`☃️ 打雪仗！<div class="big">${Math.min(throws,6)} / 6</div>按自己的互动键朝对方扔雪球！`);
+        if (throws >= 6 && fight) { fight=false; removeEventListener('keydown', fightKey); endFight(); }
+        return 'done';
+      }
+      const pos = p0.clone().lerp(p1v, e);
+      pos.y += Math.sin(e*Math.PI)*1.6;
+      ball.position.copy(pos);
+    });
+  }
+  function endFight() {
+    setMinigameHUD(null);
+    say([
+      { s:'narrator', t:'雪球扔完，两个人都成了小雪人，头发上、肩膀上全是雪，笑得直不起腰。' },
+      { s:'narrator', t:'木屋里买了两杯热可可，捧在手里，看着远处的雪山和脚下整座亮着灯的温哥华。' },
+      { s:'tammy', t:'（呵出一团白气）要是每年冬天，都能来堆一个雪人就好了。', choices:[
+        { t:'「那就写进我们每年的日程表。置顶，最高优先级。」', love:3, lines:[
+          { s:'tammy', t:'（凑过来看他真的在手机上建了个年度重复日程）「堆雪人 · 每年12月 · 与塔米」……连备注都写好了呀。' },
+          { s:'allen', t:'备注还有第二行。' },
+          { s:'tammy', t:'（凑近看——「与塔米，一直到很老很老」）……讨厌，可可要被我哭咸了啦。' },
+        ]},
+        { t:'「好，明年团子四号，后年团子五号，排到团子五十号。」', love:2, lines:[
+          { s:'tammy', t:'（掰手指）团子五十号的时候，我们都七十多岁了诶。' },
+          { s:'allen', t:'那就让孙……让未来的小朋友帮我们滚大雪球。' },
+          { s:'tammy', t:'（脸红）你你你刚才想说什么？！' },
+        ]},
+        { t:'「雪人明天中午就化了，情绪价值折旧太快。」', love:-2, lines:[
+          { s:'tammy', t:'（把可可杯往他手里一塞）好，折旧先生，你和你的资产负债表慢慢聊，我去跟团子三号告别。' },
+          { s:'allen', t:'（追上去，把自己的围巾解下来围到雪人脖子上）……这样它能多撑两天。再化之前，我们拍张照，它就永远不会化了。' },
+          { s:'tammy', t:'（看着他给雪人围围巾的样子，气一下子消了）……笨蛋。冷的是你自己呀。（把围巾又给他围回去）' },
+        ]},
+      ]},
+      { s:'joshua', t:'（雪停了，星星出来了）春天的时候，塔米——你那个藏了很久的计划，是不是该开始了？' },
+      { s:'tammy', t:'（眼睛一下子亮了，又有点紧张）……被上帝剧透了啦。' },
+    ], async () => {
+      addAffection(2);
+      await fade(true);
+      startChapter11();
+    });
+  }
+}
+
+/* ---------- 第十一章：慢一点花店 · 塔米视角 ---------- */
+async function startChapter11() {
+  const shop = buildFlowerShop();
+  const tammy = spawnTammy(0,3);
+  game.mode='solo'; game.soloChar=tammy;
+  setControlsHint('tammy');
+
+  await fade(false);
+  showChapterBanner('第 十一 章 · 塔米 视角 · 春', '慢一点花店 · 开业前夜');
+  setObjective('塔米辞了职，把攒了五年的梦想租了下来——一间小小的花店。<br>明天开业。先把<b>三束花</b>插进柜台的大花瓶吧。');
+
+  say([
+    { s:'tThink', t:'租下这间店的时候，手都在抖。五年的积蓄，一个和Allen聊了很多次的决定。' },
+    { s:'tThink', t:'店名是他起的——「慢一点花店」。他说，是我教会他慢一点，那这三个字，应该开成一家店。' },
+    { s:'tThink', t:'明天就开业了。今晚还有好多事要做……先插花吧！' },
+  ]);
+
+  let flowersDone = 0;
+  const buckets = [
+    { x:-6, z:-6, name:'粉玫瑰', color:0xff8fa3 },
+    { x:-6, z:-2, name:'白桔梗', color:0xfff8f0 },
+    { x:-6, z:2,  name:'小雏菊', color:0xffe36b },
+  ];
+  for (const b of buckets) {
+    addInteract(b.x, b.z, '取一束'+b.name, () => {
+      SFX.pickup();
+      floatText('💐 '+b.name+' 插进花瓶啦', 'good');
+      // 花出现在柜台大花瓶里
+      for (let i=0;i<3;i++) {
+        const stem=cyl(.015,.015,.5,0x5f8f5a);
+        stem.position.set((Math.random()-.5)*.3, 1.85, -3+(Math.random()-.5)*.2);
+        stem.rotation.z=(Math.random()-.5)*.4; scene.add(stem);
+        const f=sph(.09,b.color); f.position.set(stem.position.x-stem.rotation.z*.25, 2.15, stem.position.z); scene.add(f);
+      }
+      flowersDone++;
+      if (flowersDone===3) {
+        setObjective('花插好了！去墙角把<b>招牌</b>挂到门上方。');
+        signIt.marker.visible = true;
+      }
+    }, { radius:2, once:true, markerColor:0xff8fa3 });
+  }
+
+  const signIt = addInteract(-6, 5.5, '挂招牌', () => {
+    SFX.ok();
+    const from = { pos:shop.sign.position.clone(), rz:shop.sign.rotation.z, ry:shop.sign.rotation.y };
+    let e=0;
+    game.animated.push((t,dt)=>{
+      e += dt/1.8;
+      if (e>=1) {
+        shop.sign.position.set(2,3.1,7.7); shop.sign.rotation.set(0,Math.PI,0);
+        floatText('🪧 「慢一点花店」挂好啦！','good'); SFX.love();
+        setObjective('都准备好了。深呼吸——去<b>门口</b>，提前开一次门试试。');
+        doorIt.marker.visible = true;
+        return 'done';
+      }
+      shop.sign.position.lerpVectors(from.pos, new THREE.Vector3(2,3.1,7.7), e);
+      shop.sign.rotation.z = from.rz*(1-e);
+      shop.sign.rotation.y = from.ry + (Math.PI-from.ry)*e;
+    });
+  }, { radius:2.2, markerColor:0xffd76b });
+  signIt.marker.visible = false;
+
+  addInteract(1.2, -1.8, '摸摸柜台上的团子', () => {
+    SFX.pickup(); emote(tammy,'🐱');
+    say([
+      { s:'tammy', t:'团子，明天你就是镇店招财猫了哦。工资是小鱼干，季度结算。' },
+      { s:'narrator', t:'（呼噜呼噜）团子翻了个身，把肚皮朝天——它对薪资方案表示满意。' },
+    ]);
+  }, { once:false, radius:2 });
+
+  const doorIt = addInteract(2, 6.8, '开门试试', () => {
+    say([
+      { s:'narrator', t:'门上的小铃铛「叮铃」一声。门外，居然站着一个人——' },
+      { s:'tammy', t:'Allen？！你怎么在这里！都半夜了！' },
+      { s:'allen', t:'（手里抱着一块盖着布的板子，头发上还有雨点）来送开业礼物。等你挂完招牌才敢敲门……结果你先开门了。', fn:()=>{
+        const allen = spawnAllen(2,8.6,Math.PI);
+      }},
+      { s:'narrator', t:'他掀开布——是一块手工刻的木牌，上面是他设计的花店logo：一只慢吞吞的蜗牛，背着一朵小花。' },
+      { s:'allen', t:'「慢一点花店」的第一件周边。蜗牛是我，花是你。它背着你，慢慢走。' },
+      { s:'tThink', t:'……不行，眼泪要出来了。今晚的妆还试着呢。' },
+      { s:'allen', t:'另外——我要当你的第一个客人。我要订一个「永久花束套餐」：每周一束，一直订下去，一辈子。', choices:[
+        { t:'「好呀。收件人写谁？」（明知故问地笑）', love:3, lines:[
+          { s:'allen', t:'（认真填单子）收件人：塔米。备注：世界上最好的花艺师，也是我最喜欢的人。' },
+          { s:'tammy', t:'（接过单子，签下第一笔订单）本店接单。有效期：一辈子，不许退订哦。' },
+        ]},
+        { t:'「一辈子的订单，要预付定金的哦。」（伸出手）', love:2, lines:[
+          { s:'allen', t:'（在她摊开的手心里，轻轻放上一颗薄荷糖）定金。回甘很长的那种，像我们。' },
+          { s:'tammy', t:'（把糖攥紧）……这个定金，本店破例收下。' },
+        ]},
+        { t:'「这么大的订单，我们小本生意做不了啦。」（推辞）', love:-2, lines:[
+          { s:'allen', t:'（愣了一下，抱着木牌的手紧了紧）……是我唐突了吗。' },
+          { s:'tThink', t:'（看着他一下子暗下去的眼睛，心里咯噔一下）呀，他当真了——我就是嘴硬的毛病又犯了！' },
+          { s:'tammy', t:'（赶紧拽住他袖子）做得了做得了！本店最大的订单就该是你！刚才是……是砍价！对，商业砍价！' },
+          { s:'allen', t:'（松了口气，笑了）好，那我加价：每周一束，外加每天说一句喜欢你。' },
+        ]},
+      ]},
+      { s:'joshua', t:'（花店的灯光下，光轻轻地落）梦想开业大吉。——对了Allen，你藏在口袋里三个月的那个小盒子，打算什么时候拿出来？' },
+      { s:'allen', t:'（猛地捂住口袋）Joshua！！说好的保密呢！！' },
+      { s:'tammy', t:'（歪头）什么小盒子？' },
+      { s:'allen', t:'没！没什么！明天开业加油！！（落荒而逃）' },
+    ], async () => {
+      addAffection(2);
+      await fade(true);
+      startChapter12();
+    });
+  }, { radius:2.2, markerColor:0xff8fa3 });
+  doorIt.marker.visible = false;
+}
+
+/* ---------- 第十二章：英吉利湾 · 一个问题（求婚） ---------- */
+async function startChapter12() {
+  buildBeach();
+  const allen = spawnAllen(-4,10);
+  const joshua = spawnJoshua(-7,7);
+  game.mode='solo'; game.soloChar=allen;
+  setControlsHint('allen');
+
+  // 蜡烛（三支，待点亮）
+  const candles = [];
+  for (const [cx,cz] of [[-1.5,2],[1.5,2],[0,-.5]]) {
+    const cg = new THREE.Group();
+    const wax = cyl(.09,.11,.35,0xfff5e5); wax.position.y=.17; cg.add(wax);
+    const flame = sph(.06,0xffd76b,{emissive:0xffb42a,emissiveIntensity:2}); flame.position.y=.42; flame.visible=false; cg.add(flame);
+    const light = new THREE.PointLight(0xffc76b, 0, 6); light.position.y=.6; cg.add(light);
+    cg.position.set(cx,0,cz); scene.add(cg);
+    candles.push({ cg, flame, light, lit:false });
+    game.animated.push((t)=>{ if(flame.visible){ flame.scale.setScalar(1+Math.sin(t*12+cx)*.15); } });
+  }
+  // 花瓣圈
+  for (let i=0;i<16;i++){
+    const a=i/16*Math.PI*2;
+    const petal=new THREE.Mesh(new THREE.CircleGeometry(.1,8),
+      new THREE.MeshBasicMaterial({color:[0xffb6c1,0xff8fa3][i%2], side:THREE.DoubleSide}));
+    petal.rotation.x=-Math.PI/2;
+    petal.position.set(Math.cos(a)*2.4, .05, .9+Math.sin(a)*2.2);
+    scene.add(petal);
+  }
+
+  await fade(false);
+  showChapterBanner('第 十二 章 · Allen 视角', '英吉利湾 · 一个问题');
+  setObjective('回到最开始约会的海滩。口袋里的小盒子，今天终于要拿出来了。<br>先找 <b>Joshua</b> 做最后的心理建设。');
+
+  addInteract(-7, 7, '与 Joshua 对话', () => {
+    say([
+      { s:'allen', t:'（手心全是汗）Joshua，台词我练了两百遍。开场白有三个版本：抒情版、理性版、还有一个概率论版。' },
+      { s:'joshua', t:'概率论版念来听听。' },
+      { s:'allen', t:'「塔米，在78亿人中相遇的概率是十的负九次方，而我想把剩下的人生全部押在这个小概率事件上——」' },
+      { s:'joshua', t:'停。Allen，听我说——待会儿她走过来的时候，把三个版本都忘掉。' },
+      { s:'joshua', t:'你只需要看着她的眼睛。剩下的话，心会替你说。……去吧，先把蜡烛点上。她快到了。' },
+    ], () => {
+      setObjective('🕯 点亮沙滩上的<b>三支蜡烛</b>。');
+      for (const it of candleIts) it.marker.visible = true;
+    });
+  });
+
+  let litCount = 0;
+  const candleIts = candles.map((c,i) => {
+    const it = addInteract(c.cg.position.x, c.cg.position.z, '点亮蜡烛', () => {
+      c.flame.visible = true; c.light.intensity = 8; c.lit = true;
+      SFX.spark();
+      litCount++;
+      floatText('🕯 '+litCount+' / 3', 'info');
+      if (litCount===3) tammyArrives();
+    }, { radius:1.6, markerColor:0xffd76b });
+    it.marker.visible = false;
+    return it;
+  });
+
+  function tammyArrives() {
+    setObjective('蜡烛都亮了。海风很轻，日落很慢。——她来了。');
+    const tammy = spawnTammy(-18,6);
+    let e=0;
+    const from = tammy.position.clone();
+    const to = new THREE.Vector3(-1.2,0,1.2);
+    tammy.userData.speedNow = 3;
+    game.animated.push((t,dt)=>{
+      e += dt/4;
+      if (e>=1) {
+        tammy.position.copy(to);
+        tammy.userData.speedNow = 0;
+        tammy.rotation.y = Math.atan2(allen.position.x-to.x, allen.position.z-to.z);
+        proposal();
+        return 'done';
+      }
+      tammy.position.lerpVectors(from, to, e);
+      tammy.rotation.y = Math.atan2(to.x-from.x, to.z-from.z);
+    });
+  }
+
+  let knFn = null;
+  function kneel(on) {
+    const r = allen.userData.rig;
+    if (on) {
+      allen.userData.acting = true;
+      knFn = (t,dt) => {
+        const kk = Math.min(1,dt*8);
+        r.legR.rotation.x = lerpAngle(r.legR.rotation.x, -1.7, kk);
+        r.legL.rotation.x = lerpAngle(r.legL.rotation.x, -.15, kk);
+        allen.position.y = lerpAngle(allen.position.y, -.34, kk);
+        r.armR.rotation.x = lerpAngle(r.armR.rotation.x, -1.15, kk);
+        r.armL.rotation.x = lerpAngle(r.armL.rotation.x, -.3, kk);
+      };
+      game.animated.push(knFn);
+    } else {
+      allen.userData.acting = false;
+      allen.position.y = 0;
+      const i = game.animated.indexOf(knFn);
+      if (i>=0) game.animated.splice(i,1);
+    }
+  }
+  function fireworks() {
+    for (let w=0; w<4; w++) {
+      setTimeout(() => {
+        SFX.catch();
+        const cx=(Math.random()*12-6), cy=7+Math.random()*4, cz=-10-Math.random()*5;
+        const color = ['255,140,160','255,215,107','143,208,255','216,139,255'][w%4];
+        const cv=document.createElement('canvas'); cv.width=cv.height=32;
+        const c2=cv.getContext('2d');
+        const grad=c2.createRadialGradient(16,16,1,16,16,15);
+        grad.addColorStop(0,`rgba(${color},1)`); grad.addColorStop(1,`rgba(${color},0)`);
+        c2.fillStyle=grad; c2.fillRect(0,0,32,32);
+        const tex=new THREE.CanvasTexture(cv);
+        const parts=[];
+        for (let i=0;i<22;i++){
+          const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+          sp.scale.set(.5,.5,1); sp.position.set(cx,cy,cz);
+          scene.add(sp);
+          const th=Math.random()*Math.PI*2, ph2=Math.random()*Math.PI;
+          parts.push({sp, vx:Math.sin(ph2)*Math.cos(th)*4, vy:Math.cos(ph2)*4, vz:Math.sin(ph2)*Math.sin(th)*4, e:0});
+        }
+        game.animated.push((t,dt)=>{
+          let alive=false;
+          for (const p of parts){
+            p.e+=dt;
+            if (p.e>1.6){ p.sp.visible=false; continue; }
+            alive=true;
+            p.vy-=dt*3;
+            p.sp.position.x+=p.vx*dt; p.sp.position.y+=p.vy*dt; p.sp.position.z+=p.vz*dt;
+            p.sp.material.opacity=Math.max(0,1-p.e/1.6);
+          }
+          if (!alive){ for (const p of parts) scene.remove(p.sp); return 'done'; }
+        });
+      }, w*700);
+    }
+  }
+
+  function proposal() {
+    say([
+      { s:'tammy', t:'（看着烛光和花瓣，脚步慢慢停下）Allen……这是什么呀？你不是说，今晚来看日落……' },
+      { s:'narrator', t:'Allen向前一步。三个版本的开场白，在看到她眼睛的那一秒，全部忘光了。', fn:()=>{ kneel(true); emote(allen,'💍',3); } },
+      { s:'narrator', t:'他单膝跪在沙滩上，打开了那个藏了三个月的小盒子。夕阳正好落在戒指上。', choices:[
+        { t:'「塔米，慢一点的路，我想和你一起走完一辈子。嫁给我，好吗？」', love:5, lines:[
+          { s:'narrator', t:'海浪停了半拍。她的眼泪比回答先掉下来。' },
+          { s:'tammy', t:'（用力点头，一边哭一边笑）好！好呀！……你这个笨蛋，我从蒸汽钟那天就在等这句话了！' },
+        ]},
+        { t:'「我做过所有人生规划模型，每一条最优路径的起点都是你。嫁给我？」', love:4, lines:[
+          { s:'tammy', t:'（笑着哭出声）到这种时候都要讲模型……可是为什么，这是我听过最浪漫的一句话呀。' },
+          { s:'tammy', t:'我愿意。你的模型里，以后每一条路径我都要在。' },
+        ]},
+        { t:'「戒指尺寸是我按你手套的数据推算的，应该……合适。你、你愿意吗？」', love:2, lines:[
+          { s:'tammy', t:'（又好气又好笑，眼泪还是掉了下来）求婚词呢？练了两百遍的求婚词呢？！' },
+          { s:'allen', t:'（耳朵通红）看到你之后，全忘了。只记得……我想和你过一辈子。' },
+          { s:'tammy', t:'（伸出手）那就够了呀。剩下的一辈子，慢慢补给我听。——我愿意。' },
+        ]},
+      ]},
+      { s:'narrator', t:'戒指滑上无名指，大小正好。（Allen在心里默默给自己的推算打了满分。）', fn:()=>{ kneel(false); fireworks(); emote(game.tammy,'❤️',2.5); } },
+      { s:'narrator', t:'烟花在海面上炸开的时候，她扑进他怀里。远处有陌生人吹起了口哨。' },
+      { s:'joshua', t:'（望着烟花，轻轻鼓掌）从「为什么这只杯子这么温润」到「我愿意」——干得漂亮，孩子们。' },
+    ], async () => {
+      addAffection(3);
+      await fade(true);
+      startChapter13();
+    });
+  }
+}
+
+/* ---------- 第十三章：女皇公园 · 婚礼（双人） ---------- */
+async function startChapter13() {
+  buildWeddingGarden();
+  const allen = spawnAllen(-.8,8.5);
+  const tammy = spawnTammy(.8,8.5);
+  const joshua = spawnJoshua(0,-7.2);
+  game.mode='dual';
+  setControlsHint('dual');
+
+  await fade(false);
+  showChapterBanner('第 十三 章 · 双人', '女皇公园 · 婚礼');
+  setObjective('春天的女皇公园，花开满园。宾客到齐了，琴声响起来了。<br>两个人<b>一起</b>沿着花瓣小径，走到花门前。');
+
+  const archIt = addInteract(0, -4.2, '走到花门前', () => {
+    if (!bothNear(archIt.pos, 3)) { floatText('要两个人一起走过来哦', 'info'); return false; }
+    allen.position.set(-.8,0,-4.4); allen.rotation.y = Math.PI;
+    tammy.position.set(.8,0,-4.4); tammy.rotation.y = Math.PI;
+    say([
+      { s:'joshua', t:'各位来宾——还有前排打呼噜的团子——欢迎来到Allen与塔米的婚礼。' },
+      { s:'joshua', t:'作为上帝，我主持过星辰的运转和四季的更替。但说实话，今天这一场，是我最紧张的一次。' },
+      { s:'joshua', t:'我看着这两个孩子：一个走得太快，一个走得很慢。后来快的学会了等，慢的学会了牵着他走。' },
+      { s:'joshua', t:'Allen，请讲你的誓词。', choices:[
+        { t:'「我这辈子做过最聪明的决定，就是在茶空间放慢了脚步。以后每一步，我都想走在你旁边。」', love:4, lines:[
+          { s:'narrator', t:'台下响起小小的抽泣声——是塔米的花店常客们组团来的，人手一包纸巾。' },
+        ]},
+        { t:'「我承诺：每周一束花，每年一个雪人，每天说一次喜欢你。本合同永久有效，不设退出条款。」', love:3, lines:[
+          { s:'narrator', t:'台下笑声和掌声混在一起。塔米一边笑一边用手背擦眼睛。' },
+        ]},
+      ]},
+      { s:'joshua', t:'塔米轻声说：「我的誓词只有一句——往后余生，每天醒来，都觉得今天有他在，真好。」' },
+      { s:'joshua', t:'现在，请回答那个古老的问题。——P1按 E，P2按 Enter，说出你们的「我愿意」。' },
+    ], () => {
+      setObjective('💍 说出誓言！<b>P1 按 E</b>，<b>P2 按 Enter</b>——「我愿意」！');
+      setMinigameHUD('💍 交换誓言<div class="big">P1 按 E　·　P2 按 Enter</div>');
+      vowActive = true;
+    });
+  }, { radius:3.2, markerColor:0xff8fa3 });
+
+  let vowActive=false, vowA=false, vowT=false;
+  const vowKey = (e) => {
+    if (!vowActive || game.inDialogue || !game.playing) return;
+    if ((e.code==='KeyE'||e.code==='Space') && !vowA) {
+      vowA = true; SFX.love(); emote(allen,'💍',2);
+      floatText('Allen：「我愿意。」', 'good');
+      checkVows();
+    }
+    if (e.code==='Enter' && !vowT) {
+      vowT = true; SFX.love(); emote(tammy,'💍',2);
+      floatText('塔米：「我愿意。」', 'good');
+      checkVows();
+    }
+  };
+  addEventListener('keydown', vowKey);
+  function checkVows() {
+    if (!(vowA && vowT)) return;
+    vowActive = false;
+    removeEventListener('keydown', vowKey);
+    setMinigameHUD(null);
+    petalRain();
+    let e=0, spinFn;
+    spinFn = (t,dt)=>{
+      e+=dt;
+      const a=e*2;
+      allen.position.set(Math.cos(a)*.8, 0, -4.4+Math.sin(a)*.8);
+      tammy.position.set(-Math.cos(a)*.8, 0, -4.4-Math.sin(a)*.8);
+      allen.rotation.y = Math.atan2(tammy.position.x-allen.position.x, tammy.position.z-allen.position.z);
+      tammy.rotation.y = Math.atan2(allen.position.x-tammy.position.x, allen.position.z-tammy.position.z);
+      if (e>6) return 'done';
+    };
+    game.animated.push(spinFn);
+    emote(allen,'❤️',2.5); emote(tammy,'❤️',2.5);
+    say([
+      { s:'joshua', t:'凭着爱、时间、以及若干杯热奶茶的名义——我宣布，你们正式结为夫妻！' },
+      { s:'narrator', t:'花瓣从天而降。小提琴拉起了那首格兰维尔岛的老歌。团子睡醒了，打了一个庆祝的哈欠。' },
+      { s:'narrator', t:'两个人在花门下转着圈跳舞，像那年市场的大街上一样，舞步依然很烂，笑声依然很大。' },
+      { s:'tammy', t:'（在旋转里凑到他耳边）诶，Allen。还记得你以前的那个公式吗？心动概率=相遇频率×停留时长。' },
+      { s:'allen', t:'记得。现在有修正版了——只要变量是你，概率恒等于百分之百。' },
+      { s:'joshua', t:'（仰头看着漫天花瓣，轻声说）我的工作，差不多完成了。剩下的日子，交给他们自己慢慢走吧。' },
+    ], async () => {
+      addAffection(4);
+      await fade(true);
+      startChapter14();
+    });
+  }
+  function petalRain(dur=9) {
+    const petals=[];
+    for (let i=0;i<44;i++){
+      const p=new THREE.Mesh(new THREE.CircleGeometry(.09,8),
+        new THREE.MeshBasicMaterial({color:[0xffb6c1,0xff8fa3,0xfff0f4][i%3], side:THREE.DoubleSide, transparent:true}));
+      p.position.set((Math.random()-.5)*16, 4+Math.random()*4, -4+(Math.random()-.5)*10);
+      scene.add(p); petals.push({p, ph:Math.random()*8, sp:.5+Math.random()*.6});
+    }
+    let e=0;
+    game.animated.push((t,dt)=>{
+      e+=dt;
+      for (const o of petals){
+        o.p.position.y-=o.sp*dt;
+        o.p.position.x+=Math.sin(t*2+o.ph)*.3*dt;
+        o.p.rotation.x=t*2+o.ph; o.p.rotation.y=t*1.4+o.ph;
+        if (o.p.position.y<.05) o.p.position.y=6+Math.random()*2;
+        if (e>dur) o.p.material.opacity=Math.max(0,1-(e-dur));
+      }
+      if (e>dur+1){ for (const o of petals) scene.remove(o.p); return 'done'; }
+    });
+  }
+}
+
+/* ---------- 终章：几年以后 · 家（双人） ---------- */
+async function startChapter14() {
+  buildHome();
+  const allen = spawnAllen(2,6);
+  const tammy = spawnTammy(-2,6);
+  const joshua = spawnJoshua(6,4);
+  game.mode='dual';
+  setControlsHint('dual');
+
+  await fade(false);
+  showChapterBanner('终 章 · 双人', '几年以后 · 家');
+  setObjective('几年过去了。随便走走——<b>相框</b>里有回忆，<b>Joshua</b> 有话说，<br>最后两个人一起在<b>沙发</b>坐下。');
+
+  addInteract(6, 4, '与 Joshua 对话', () => {
+    say([
+      { s:'joshua', t:'几年以后。有人问Allen：「为什么最后选择了塔米？」' },
+      { s:'joshua', t:'答案不用急着说。先去沙发上一起坐一会儿吧——答案自己会出现的。' },
+    ]);
+  }, { once:false });
+
+  addInteract(4.5, -8.6, '看看相框', () => {
+    const s = game.stats;
+    say([
+      { s:'narrator', t:'相框里是那年海边的合照——两个人举着小桶，里面是一起钓上来的鱼。' },
+      { s:'allen', t:`那天我们钓了${Math.max(s.fish,5)}条鱼${s.shells>=5?'，你还捡了一兜贝壳，说要串成风铃':''}。回来的路上你就在车里睡着了。` },
+      { s:'tammy', t:`旁边那张是萤火虫呀。${s.fireflies>=8?'满满一罐光，最后我们全放走了。':'那晚的星星，是我见过最多的一次。'}你说「我找到了」的时候，我心跳得好快。` },
+      { s:'narrator', t:`墙上还贴着煤气镇的${Math.max(s.photos,1)}张拍立得、格兰维尔岛买菜的小票，和一片在斯坦利公园捡的、压得平平整整的枫叶——都是慢慢攒下来的日子。` },
+      { s:'narrator', t:'相框下面压着一张已经泛黄的便利贴，上面的爱心被摸得发亮。' },
+    ]);
+  }, { once:false, markerColor:0xffd76b });
+
+  const sofaIt = addInteract(0, 2.5, '一起在沙发坐下', () => {
+    if (!bothNear(sofaIt.pos, 3.2)) { floatText('要两个人一起坐哦', 'info'); return false; }
+    allen.position.set(-.7,0,2.4); allen.rotation.y=Math.PI;
+    tammy.position.set(.7,0,2.4); tammy.rotation.y=Math.PI;
+    setSitting(allen,true,.55); setSitting(tammy,true,.55);
+    say([
+      { s:'narrator', t:'窗外是温哥华的天际线和远处的雪山。桌上是两杯茶，是当年茶空间的那种青瓷杯。' },
+      { s:'tammy', t:'（靠在他肩上）诶，Allen。有人问过你吧——为什么最后选了我呀？' },
+      { s:'narrator', t:'Allen望着窗边的花，轻轻笑了。他说——', choices:[
+        { t:'「她没有改变我的世界。她只是让我发现，原来生活本来就可以这么美。」', love:4, lines:[
+          { s:'tammy', t:'（她抬起头看他，眼睛弯弯的，像那年茶空间的午后）……这个答案，我给满分。' },
+        ]},
+        { t:'「因为和她在一起，我这个理科生终于学会了慢一点。」', love:3, lines:[
+          { s:'tammy', t:'（她把一支桔梗别到他胸前的口袋）奖励给学会慢下来的Allen先生。花语是「永恒的爱」哦。' },
+        ]},
+      ]},
+      { s:'tammy', t:'遇见Allen以后，我才知道，最好的爱情不是轰轰烈烈。' },
+      { s:'tammy', t:'而是每天醒来，都觉得今天有他在，真好。' },
+      { s:'allen', t:'（他握住她的手，就像那年在海边一样）塔米，说好了的——以后我们老了，还要一起坐着看海。' },
+      { s:'tammy', t:'好呀。慢一点走，我们有一辈子呢。' },
+      { s:'joshua', t:'（光轻轻散开）我的工作完成了。慢一点的人，都会被温柔的事情追上。' },
+    ], async () => {
+      addAffection(2);
+      await fade(true);
+      showEnding();
+    });
+  }, { radius:3.4, markerColor:0xff8fa3 });
+}
+
+/* ---------- 结局 ---------- */
+function showEnding() {
+  game.playing = false;
+  document.getElementById('hud').classList.remove('show');
+  const e = document.getElementById('ending');
+  const s = game.stats;
+  e.querySelector('.score').textContent =
+    `最终心动值：${game.affection}　${'♥'.repeat(Math.min(10,Math.ceil(game.affection/8)))}`;
+  e.querySelector('.stats').innerHTML =
+    `🎣 一起钓到的鱼：${s.fish} 条　·　✨ 捉过的萤火虫：${s.fireflies} 只　·　🐚 贝壳：${s.shells} / 5<br>` +
+    `📸 煤气镇拍立得：${s.photos} 张　·　🛒 市场采购：${s.groceries} 样　·　🍁 海堤枫叶：${s.leaves} 片<br>` +
+    `💢 惹塔米生气：${s.angry} 次`;
+  const c = document.getElementById('ending-comment');
+  if (game.affection >= 66 && s.angry === 0)
+    c.textContent = 'Joshua：完美结局 —— 一次都没让她生气，理科生也能拿满分情商。你们把整座温哥华，走成了两个人的城市。';
+  else if (game.affection >= 66)
+    c.textContent = 'Joshua：完美结局 —— 虽然偶尔嘴笨，但每一次你都愿意先靠近一步。这才是真正的满分。';
+  else if (game.affection >= 46)
+    c.textContent = 'Joshua：温柔结局 —— 爱情里偶尔笨拙也没关系，重要的是你一直在学。';
+  else
+    c.textContent = 'Joshua：慢慢来结局 —— 惹她生气了不少次呢……没关系，爱本来就是要慢慢练习的。再来一次？';
+  e.classList.add('show');
+}
+document.getElementById('replay-btn').onclick = () => location.reload();
+
+/* ============================================================
+   标题界面 & 启动
+============================================================ */
+const ts = document.getElementById('title-screen');
+for (let i=0;i<14;i++) {
+  const h = document.createElement('div');
+  h.className='heart-float';
+  h.textContent = ['♥','♡','❀','✿'][i%4];
+  h.style.left = Math.random()*100+'vw';
+  h.style.animationDuration = (9+Math.random()*10)+'s';
+  h.style.animationDelay = (-Math.random()*12)+'s';
+  h.style.fontSize = (14+Math.random()*20)+'px';
+  h.style.color = ['#ff6f91','#c9a7d8','#ffb26b'][i%3];
+  ts.appendChild(h);
+}
+document.getElementById('start-btn').onclick = async () => {
+  audio();
+  SFX.ok();
+  ts.classList.add('hidden');
+  await fade(true);
+  startChapter1();
+};
+
+// 标题背景：茶室 + 环绕镜头 + 站着的两个人
+buildTeaHouse();
+(function titlePreview(){
+  const a = makeCharacter({ shirt:0x3b7fe0, pants:0x2b3a55, hair:0x2a2320, glasses:true });
+  a.position.set(-1,0,-2); a.rotation.y=.5; scene.add(a); game.chars.push(a);
+  const tm = makeCharacter({ shirt:0xffffff, pants:0xc9a7d8, hair:0x4a3226, longHair:true, skirt:true });
+  tm.position.set(1,0,-2); tm.rotation.y=-.5; scene.add(tm); game.chars.push(tm);
+})();
+camera.position.set(10,6,12);
+
+/* ============================================================
+   主循环
+============================================================ */
+const clock = new THREE.Clock();
+function loop() {
+  requestAnimationFrame(loop);
+  const dt = Math.min(.05, clock.getDelta());
+  const t = clock.elapsedTime;
+
+  if (!game.playing && !ts.classList.contains('hidden')) {
+    camera.position.set(Math.cos(t*.12)*13, 6, Math.sin(t*.12)*13);
+    camera.lookAt(0,1.5,0);
+  } else {
+    updateMovement(dt);
+    updateCamera(dt);
+    updateInteractables();
+  }
+  for (const c of game.chars) animateChar(c, dt, t);
+  for (let i = game.animated.length - 1; i >= 0; i--) {
+    if (game.animated[i](t, dt) === 'done') game.animated.splice(i, 1);
+  }
+  for (const it of game.interactables) {
+    if (it.marker && it.marker.visible) {
+      const s = 1 + Math.sin(t*3)*.12;
+      it.marker.scale.set(s,1,s);
+      it.marker.rotation.y = t*.8;
+    }
+  }
+  renderer.render(scene, camera);
+}
+loop();
+</script>
+</body>
+</html>
